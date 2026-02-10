@@ -15,6 +15,15 @@ import 'screens/main_app.dart';
 // Firebase conditionally imported for platforms that support it
 import 'package:firebase_core/firebase_core.dart';
 
+/// The main entry point for the CropAId application.
+/// 
+/// This function is responsible for:
+/// 1. Initializing the Flutter binding.
+/// 2. Initializing Firebase (if applicable).
+/// 3. Setting preferred device orientations.
+/// 4. Configuring the system UI overlay style.
+/// 5. Initializing core services (Preferences, Consent, Audio).
+/// 6. Running the [CropAIdApp].
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -55,8 +64,13 @@ void main() async {
   runApp(const CropAIdApp());
 }
 
-/// CropAId - Smart Crop Diagnosis & Farmer Support Platform
-/// Flutter conversion of the React Vite web app
+/// The root widget of the CropAId application.
+/// 
+/// This widget sets up the [MaterialApp] with:
+/// - A [MultiProvider] for state management (e.g., [LanguageProvider]).
+/// - Theme configuration (light and dark modes).
+/// - Localization support using [TranslationDelegate] and global delegates.
+/// - The main home screen ([MainApp]).
 class CropAIdApp extends StatelessWidget {
   const CropAIdApp({super.key});
 

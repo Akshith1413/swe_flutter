@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/constants/app_constants.dart';
 
-/// ConsentScreen - Privacy and data consent
-/// Matches React's ConsentScreen.jsx
+/// Screen for displaying privacy policy and collecting user consent.
+/// 
+/// explains:
+/// - Why data is collected (Image analysis).
+/// - Local storage usage.
+/// - Requires user agreement before proceeding.
+/// 
+/// Equivalent to React's `ConsentScreen.jsx`.
 class ConsentScreen extends StatefulWidget {
   final VoidCallback onConsent;
 

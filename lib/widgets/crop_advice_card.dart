@@ -3,6 +3,13 @@ import 'package:flutter/services.dart';
 import '../core/theme/app_colors.dart';
 import '../models/analysis_result.dart';
 
+/// A card widget that displays detailed AI-generated crop advice.
+/// 
+/// Shows:
+/// - Crop and detected disease information.
+/// - Confidence and severity levels.
+/// - Detailed sections for cause, symptoms, immediate action, solutions, and prevention.
+/// - Copy-to-clipboard functionality.
 class CropAdviceCard extends StatefulWidget {
   final AnalysisResult result;
   final VoidCallback onClose;
@@ -20,6 +27,7 @@ class CropAdviceCard extends StatefulWidget {
 class _CropAdviceCardState extends State<CropAdviceCard> {
   bool _copied = false;
 
+  /// Copies the advice details to the system clipboard.
   void _handleCopy() {
     final text = '''
 Crop: ${widget.result.crop}
@@ -320,6 +328,7 @@ PREVENTION: ${widget.result.prevention}
   }
 }
 
+/// Helper widget to display a section of advice.
 class _AdviceSection extends StatelessWidget {
   final IconData icon;
   final String title;

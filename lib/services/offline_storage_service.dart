@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pending_media.dart';
 
-/// Offline Storage Service for pending media uploads
-/// US15: Offline image saving with sync status
+/// Service for managing offline media storage and synchronization.
+/// 
+/// Implements User Story 15: Offline image saving with sync status.
+/// Uses [SharedPreferences] to store pending uploads encoded as JSON strings.
 class OfflineStorageService {
   static const String _storageKey = 'pending_media_items';
   static const String _syncStatusKey = 'sync_status';
@@ -12,11 +14,12 @@ class OfflineStorageService {
   SharedPreferences? _prefs;
   bool _isSyncing = false;
 
+  /// Initializes the service.
   Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
   }
 
-  /// Get all pending media items (sorted by date, newest first)
+  /// Retrieves all pending media items, sorted by date (newest first).
   Future<List<PendingMedia>> getAllPendingMedia() async {
     _prefs ??= await SharedPreferences.getInstance();
     final List<String> list = _prefs!.getStringList(_storageKey) ?? [];
@@ -27,7 +30,7 @@ class OfflineStorageService {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  /// Save media for offline sync
+  /// Saves a media item for later synchronization.
   Future<void> savePendingMedia(PendingMedia media) async {
     _prefs ??= await SharedPreferences.getInstance();
     final List<String> list = _prefs!.getStringList(_storageKey) ?? [];
@@ -38,7 +41,7 @@ class OfflineStorageService {
     debugPrint('Saved pending media: ${media.id}');
   }
 
-  /// Delete a specific media item
+  /// Deletes a specific pending media item by [id].
   Future<void> deletePendingMedia(String id) async {
     _prefs ??= await SharedPreferences.getInstance();
     final List<String> list = _prefs!.getStringList(_storageKey) ?? [];
@@ -52,16 +55,18 @@ class OfflineStorageService {
     debugPrint('Deleted pending media: $id');
   }
 
-  /// Get count of pending items
+  /// Returns the total count of pending items (synced + unsynced).
   Future<int> getPendingCount() async {
     final items = await getAllPendingMedia();
     return items.length;
   }
 
-  /// US15: Sync status
+  /// Returns true if a sync operation is currently in progress.
   bool get isSyncing => _isSyncing;
 
-  /// US15: Mark item as synced
+  /// Marks a specific media item as synced.
+  /// 
+  /// Updates the `isSynced` flag of the item in local storage.
   Future<void> markAsSynced(String id) async {
     _prefs ??= await SharedPreferences.getInstance();
     final List<String> list = _prefs!.getStringList(_storageKey) ?? [];
@@ -77,7 +82,10 @@ class OfflineStorageService {
     await _prefs!.setStringList(_storageKey, updatedList);
   }
 
-  /// US15: Sync all pending media (simulated)
+  /// Attempts to sync all pending media items to the server.
+  /// 
+  /// Returns a [SyncResult] summarizing successes and failures.
+  /// Currently simulates the upload process.
   Future<SyncResult> syncAllPending() async {
     if (_isSyncing) {
       return SyncResult(success: 0, failed: 0, message: 'Sync already in progress');
@@ -124,19 +132,20 @@ class OfflineStorageService {
     }
   }
 
-  /// US15: Get unsynced count
+  /// Returns the count of items that have not yet been synced.
   Future<int> getUnsyncedCount() async {
     final items = await getAllPendingMedia();
     return items.where((m) => !m.isSynced).length;
   }
 
-  /// Clear all pending media
+  /// Clears all pending media from storage.
   Future<void> clearAll() async {
     _prefs ??= await SharedPreferences.getInstance();
     await _prefs!.remove(_storageKey);
   }
 }
 
+/// Result of a synchronization operation.
 class SyncResult {
   final int success;
   final int failed;

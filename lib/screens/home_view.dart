@@ -3,8 +3,16 @@ import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
 
-/// HomeView - Main app home screen with action grid
-/// Matches React's HomeView component in CropDiagnosisApp.jsx
+/// HomeView - Main app home screen with action grid.
+/// 
+/// Features:
+/// - Dynamic greeting based on time of day.
+/// - Guest mode banner (US6).
+/// - Quick actions grid for main features (Scan, Upload, Voice, Record, History, LLM Advice).
+/// - Weather widget.
+/// - Pest alert and quick tips.
+/// 
+/// Matches React's `HomeView` component in `CropDiagnosisApp.jsx`.
 class HomeView extends StatefulWidget {
   final Function(String) onNavigate;
   final bool isOnline;
@@ -28,6 +36,7 @@ class _HomeViewState extends State<HomeView> {
     _checkGuestMode();
   }
 
+  /// Checks if the user is in guest mode to display the banner.
   Future<void> _checkGuestMode() async {
     final isGuest = await consentService.isGuestMode();
     if (mounted) {
@@ -37,6 +46,7 @@ class _HomeViewState extends State<HomeView> {
     }
   }
 
+  /// Returns the translation key for the greeting based on the current hour.
   String _getGreetingKey() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'homeView.greeting.morning';
@@ -99,6 +109,7 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  /// Builds the guest mode banner prompting users to sign up.
   Widget _buildGuestBanner(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -268,6 +279,9 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
+  /// Builds the main grid of action buttons.
+  /// 
+  /// layout adapts based on screen width.
   Widget _buildMainActionsGrid(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {

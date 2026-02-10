@@ -5,8 +5,15 @@ import '../services/crop_advice_service.dart';
 import '../widgets/crop_advice_card.dart';
 import '../models/analysis_result.dart';
 
-/// LLM Advice View - Get AI advice for crop diseases
-/// Matches React's CropAdviceDemo component
+/// LLM Advice View - AI-powered crop disease diagnosis and advice.
+/// 
+/// Features:
+/// - Manual input for crop name and disease.
+/// - Severity selection (Low, Medium, High).
+/// - Confidence level input.
+/// - Displays AI-generated advice using `CropAdviceService`.
+/// 
+/// Matches React's `LlmAdviceView` component in `CropDiagnosisApp.jsx`.
 class LlmAdviceView extends StatefulWidget {
   final VoidCallback onBack;
 
@@ -20,6 +27,7 @@ class LlmAdviceView extends StatefulWidget {
 }
 
 class _LlmAdviceViewState extends State<LlmAdviceView> {
+  // Default user input values
   final _cropController = TextEditingController(text: 'Tomato');
   final _diseaseController = TextEditingController(text: 'Early Blight');
   String _severity = 'medium';
@@ -34,6 +42,11 @@ class _LlmAdviceViewState extends State<LlmAdviceView> {
     super.dispose();
   }
 
+  /// Fetches AI-generated advice based on user inputs.
+  /// 
+  /// Calls `CropAdviceService.getCropAdvice` with the provided parameters.
+  /// Displays the result in a scrollable modal bottom sheet using `CropAdviceCard`.
+  /// Handles loading states and error display.
   Future<void> _getAdvice() async {
     setState(() {
       _isLoading = true;

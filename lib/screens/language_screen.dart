@@ -4,8 +4,14 @@ import '../core/theme/app_colors.dart';
 import '../core/providers/language_provider.dart';
 import '../core/localization/translation_service.dart';
 
-/// LanguageScreen - Language selection with voice input
-/// Matches React's LanguageScreen.jsx
+/// Screen for selecting the application language.
+/// 
+/// Features:
+/// - Grid of available languages (English, Telugu, Hindi).
+/// - Search functionality (by English or Native name).
+/// - Voice input simulation for selecting language.
+/// 
+/// Equivalent to React's `LanguageScreen.jsx`.
 class LanguageScreen extends StatefulWidget {
   final Function(String) onSelect;
 
@@ -29,6 +35,9 @@ class _LanguageScreenState extends State<LanguageScreen> {
     super.dispose();
   }
 
+  /// Simulates voice input detection.
+  /// 
+  /// In a real app, this would use `speech_to_text` package.
   void _startVoiceInput() {
     setState(() {
       _isListening = true;
@@ -177,8 +186,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                               color: _isListening
                                   ? const Color(0xFFFF4757).withOpacity(0.4)
                                   : Colors.black.withOpacity(0.15),
-                              blurRadius: _isListening ? 16 : 12,
-                              offset: const Offset(0, 4),
+                                  blurRadius: _isListening ? 16 : 12,
+                                  offset: const Offset(0, 4),
                             ),
                           ],
                         ),

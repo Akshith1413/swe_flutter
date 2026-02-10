@@ -1,6 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+/// A widget that renders an animated particle effect background.
+/// 
+/// Simulates 3D floating particles that move around and bounce off walls.
+/// Replicates the 'ParticleCanvas' component from the React web app.
 class ParticleCanvas extends StatefulWidget {
   const ParticleCanvas({super.key});
 
@@ -53,6 +57,7 @@ class _ParticleCanvasState extends State<ParticleCanvas> with SingleTickerProvid
   }
 }
 
+/// Represents a single particle in the simulation.
 class _Particle {
   double x = 0;
   double y = 0;
@@ -85,6 +90,7 @@ class _Particle {
     opacity = random.nextDouble() * 0.5 + 0.3;
   }
 
+  /// Updates the particle's position based on its velocity.
   void update() {
     x += vx;
     y += vy;
@@ -97,6 +103,7 @@ class _Particle {
   }
 }
 
+/// Custom painter to draw the particles on the canvas.
 class _ParticlePainter extends CustomPainter {
   final List<_Particle> particles;
 

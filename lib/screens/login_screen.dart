@@ -4,8 +4,16 @@ import '../core/theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/audio_service.dart';
 
-/// LoginScreen - OTP-based authentication
-/// Matches React's LoginScreen.jsx
+/// Screen for user authentication via Phone Number and OTP.
+/// 
+/// supports:
+/// - Entering a 10-digit mobile number.
+/// - Receiving and entering a 6-digit OTP.
+/// - Automatic OTP verification (on supported platforms/devices).
+/// - Resend OTP timer (US1).
+/// - Audio guidance for accessibility.
+/// 
+/// Equivalent to React's `LoginScreen.jsx`.
 class LoginScreen extends StatefulWidget {
   final Function() onLogin;
   final VoidCallback onSkip;
@@ -47,6 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Starts the 60-second countdown timer for resending OTP.
   void _startResendTimer() {
     setState(() {
       _resendSeconds = 60;
@@ -63,6 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  /// Initiates the OTP sending process.
+  /// 
+  /// Validates the phone number and calls [AuthService.sendOtp].
+  /// Handles mock mode specific logic (e.g., showing the OTP in a snackbar).
   Future<void> _sendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.length != 10) {
@@ -105,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Verifies the entered OTP code.
   Future<void> _verifyOtp() async {
     if (_otpController.text.length != 6) {
       _showMessage('Please enter 6-digit OTP');

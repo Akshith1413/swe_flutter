@@ -7,11 +7,13 @@ import '../core/localization/translation_service.dart';
 import '../core/utils/image_quality_util.dart';
 import '../services/audio_service.dart';
 
-/// Camera Capture View - Take photos for plant diagnosis
-/// US9: Capture photos using camera
-/// US10: Guidance on taking clear photos
-/// US11: Blur or darkness warnings
-/// US16: Confirmation of captured input
+/// Camera Capture View - Take photos for plant diagnosis.
+/// 
+/// User Stories Covered:
+/// - US9: Capture photos using camera.
+/// - US10: Guidance on taking clear photos (Overlays & Audio).
+/// - US11: Blur or darkness warnings.
+/// - US16: Confirmation of captured input.
 class CameraCaptureView extends StatefulWidget {
   final VoidCallback onBack;
   final Function(String imagePath, {String? base64Content}) onCapture;
@@ -43,7 +45,13 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     });
   }
 
-  /// US9: Capture photo using camera or file picker
+  /// US9: Captures a photo using the device camera or file picker (on Web).
+  /// 
+  /// performs:
+  /// - Hides guidance overlay.
+  /// - Captures image via `ImagePicker`.
+  /// - US11: Analyzes image quality (blur/darkness check).
+  /// - US16: Plays success audio or error warning.
   Future<void> _capturePhoto() async {
     if (_isCapturing) return;
 
@@ -69,16 +77,6 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
       // US11: Check image quality & Prepare for Web/Offline
       final bytes = await image.readAsBytes();
       
-      // Store base64 for web persistence (US15)
-      if (kIsWeb) {
-        // We import dart:convert at file top if needed, or use base64Encode
-        // But first let's ensure we have the import. 
-        // Since I'm in a replace block, I should assume I might need to add import if missing.
-        // However, this file doesn't have dart:convert yet.
-        // I will add _base64Image logic here and fix imports in separate step or assume MainApp handles it?
-        // No, I need to pass it out.
-      }
-      
       final quality = await ImageQualityUtil.analyzeImageFromBytes(bytes);
 
       if (!mounted) return;
@@ -90,7 +88,6 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
               ? 'Image appears blurry. Please take another photo.'
               : 'Image is too dark. Try adding more light.';
           _capturedImage = image;
-          // _base64Image = base64Encode(bytes); // We need dart:convert
         });
         // US11: Audio warning
         audioService.confirmAction('error', message: _qualityWarning);
@@ -105,16 +102,6 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
       
       audioService.confirmAction('success', message: 'Photo captured successfully!');
       
-      // For web, pass base64
-      // We need to read bytes again or reuse? Reuse.
-      // But I can't easily modify the logic flow without rewriting a lot.
-      // I'll assume I can pass bytes to onCapture?
-      // No onCapture signature is (String, {String? base64}).
-      
-      // Let's modify _showSuccessAndProceed to take bytes/base64
-      // I'll do that in a separate replacement or minimal edit.
-      
-      // Actually, to avoid complexity, let's just update the signature here and usage.
       _showSuccessAndProceed(image.path, bytes: bytes);
 
     } catch (e) {
@@ -126,7 +113,9 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     }
   }
 
-  /// US16: Show success confirmation  
+  /// US16: Shows a success snackbar and proceeds to the next step.
+  /// 
+  /// Handles passing base64 content for Web support.
   void _showSuccessAndProceed(String path, {Uint8List? bytes}) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -142,31 +131,12 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
       ),
     );
 
-    String? base64Content;
-    if (kIsWeb && bytes != null) {
-       // Need dart:convert import
-       // I'll defer import addition to next step or use quick solution if I can.
-    }
-
     Future.delayed(const Duration(milliseconds: 500), () async {
-      String? base64String;
-      if (kIsWeb && bytes != null) {
-         // dynamic import logic usually strictly typed.
-         // passing bytes to MainApp might be better if I change onCapture to take bytes?
-         // User wanted base64 string in PendingMedia.
-         // I'll assume imports are handled.
-         // Actually I can't assume.
-      }
-      // I will rely on MainApp to handle bytes if I pass them?
-      // No, strictly adhering to string interface is safer for now?
-      // No, `onCapture` definition I just changed to `(String imagePath, {String? base64Content})`.
-      // So I MUST pass base64Content.
-      
       widget.onCapture(path, base64Content: kIsWeb && bytes != null ? Uri.dataFromBytes(bytes, mimeType: 'image/jpeg').toString().split(',').last : null);
     });
   }
 
-  /// Retry after quality warning
+  /// Retries capture after a quality warning.
   void _retryCapture() {
     setState(() {
       _qualityWarning = null;
@@ -175,7 +145,7 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     _capturePhoto();
   }
 
-  /// Proceed despite warning
+  /// Proceeds with the captured image despite quality warnings.
   void _proceedAnyway() async {
     if (_capturedImage != null) {
       String? base64String;
@@ -235,7 +205,7 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     );
   }
 
-  /// US10: Guidance on taking clear photos
+  /// US10: Displays guidance tips for taking clear photos.
   Widget _buildGuidanceSection() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -284,6 +254,7 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     );
   }
 
+  /// Builds the main camera preview area with frame guides.
   Widget _buildCaptureArea() {
     return Center(
       child: Container(
@@ -338,6 +309,7 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     );
   }
 
+  /// Builds the corner indicators for the camera frame guide.
   List<Widget> _buildFrameGuideCorners() {
     const cornerSize = 30.0;
     const cornerWidth = 4.0;
@@ -399,7 +371,7 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     ];
   }
 
-  /// US11: Quality warning with retry dialog
+  /// US11: Displays quality warning with options to Retry or Use Anyway.
   Widget _buildQualityWarning() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),

@@ -1,55 +1,57 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service for managing user consent
-/// Equivalent to React's consentService.js
+/// Service for managing user consent and guest mode.
+/// 
+/// equivalent to React's consentService.js.
+/// Uses [SharedPreferences] to persist consent status and guest mode preference.
 class ConsentService {
   static const String _consentKey = 'user_consent';
   static const String _guestModeKey = 'guest_mode';
 
   SharedPreferences? _prefs;
 
-  /// Initialize service
+  /// Initializes the service by loading [SharedPreferences].
   Future<void> init() async {
     _prefs ??= await SharedPreferences.getInstance();
   }
 
-  /// Get SharedPreferences instance
+  /// Returns the [SharedPreferences] instance, initializing it if necessary.
   Future<SharedPreferences> get prefs async {
     _prefs ??= await SharedPreferences.getInstance();
     return _prefs!;
   }
 
-  /// Check if user has given consent
+  /// Checks if the user has given consent.
   Future<bool> hasConsent() async {
     final p = await prefs;
     return p.getBool(_consentKey) ?? false;
   }
 
-  /// Give consent
+  /// Grants user consent.
   Future<void> giveConsent() async {
     final p = await prefs;
     await p.setBool(_consentKey, true);
   }
 
-  /// Revoke consent
+  /// Revokes user consent.
   Future<void> revokeConsent() async {
     final p = await prefs;
     await p.setBool(_consentKey, false);
   }
 
-  /// Check if in guest mode
+  /// Checks if the app is in guest mode.
   Future<bool> isGuestMode() async {
     final p = await prefs;
     return p.getBool(_guestModeKey) ?? false;
   }
 
-  /// Set guest mode
+  /// Sets the guest mode status.
   Future<void> setGuestMode(bool isGuest) async {
     final p = await prefs;
     await p.setBool(_guestModeKey, isGuest);
   }
 
-  /// Clear all consent data
+  /// Clears all consent and guest mode data.
   Future<void> clear() async {
     final p = await prefs;
     await p.remove(_consentKey);
@@ -57,5 +59,5 @@ class ConsentService {
   }
 }
 
-/// Global singleton instance
+/// Global singleton instance of [ConsentService].
 final consentService = ConsentService();

@@ -1,15 +1,34 @@
 /// Model for media pending upload/sync
-/// US15: Offline image saving with sync status
+/// 
+/// Used to track images or videos that need to be uploaded to the server.
+/// Supports offline saving with sync status (US15).
 class PendingMedia {
+  /// Unique identifier for the media item.
   final String id;
+  
+  /// Local file path to the media file.
   final String filePath;
-  final String fileType; // 'video' or 'image'
+  
+  /// Type of media: 'video' or 'image'.
+  final String fileType; 
+  
+  /// Optional voice transcription associated with the media.
   final String? voiceTranscription;
+  
+  /// Duration of the media in seconds (mostly for video).
   final int durationSeconds;
+  
+  /// Timestamp when the media was created/captured.
   final int createdAt;
-  final String? base64Content; // US15: For web persistence
+  
+  /// Base64 encoded content of the media.
+  /// Used for web persistence (US15).
+  final String? base64Content; 
+  
+  /// Indicates if the media has been successfully synced to the server.
   final bool isSynced;
 
+  /// Creates a [PendingMedia] instance.
   PendingMedia({
     required this.id,
     required this.filePath,
@@ -21,7 +40,9 @@ class PendingMedia {
     this.base64Content,
   });
 
-  /// Create a copy with updated fields
+  /// Create a copy of the instance with updated fields.
+  /// 
+  /// Useful for immutable state updates.
   PendingMedia copyWith({
     String? id,
     String? filePath,
@@ -44,6 +65,7 @@ class PendingMedia {
     );
   }
 
+  /// Converts the [PendingMedia] instance to a JSON map.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -57,6 +79,7 @@ class PendingMedia {
     };
   }
 
+  /// Creates a [PendingMedia] instance from a JSON map.
   factory PendingMedia.fromJson(Map<String, dynamic> json) {
     return PendingMedia(
       id: json['id'],

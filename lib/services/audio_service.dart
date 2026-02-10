@@ -3,7 +3,12 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'preferences_service.dart';
 
-/// Service for managing audio feedback
+/// Service for managing audio feedback and text-to-speech.
+/// 
+/// This service handles:
+/// - Text-to-Speech (TTS) announcements.
+/// - Sound effects for user interactions (success, error, click).
+/// - Managing global sound and voice preferences.
 class AudioService {
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -13,7 +18,9 @@ class AudioService {
   bool _isInitialized = false;
   String _currentLanguage = 'en-IN';
 
-  /// Initialize audio service
+  /// Initialize the audio service.
+  /// 
+  /// Loads preferences and configures TTS settings.
   Future<void> init() async {
     if (_isInitialized) return;
 
@@ -29,35 +36,49 @@ class AudioService {
     _isInitialized = true;
   }
 
-  /// Set TTS language
+  /// Sets the TTS language.
+  /// 
+  /// [speechCode] should be a valid locale code (e.g., 'en-US', 'hi-IN').
   Future<void> setLanguage(String speechCode) async {
     _currentLanguage = speechCode;
     await _tts.setLanguage(speechCode);
   }
 
-  /// Enable/disable sound effects
+  /// Enables or disables sound effects.
+  /// 
+  /// Persists the preference using [PreferencesService].
   Future<void> setSoundEnabled(bool enabled) async {
     _soundEnabled = enabled;
     await preferencesService.setSoundEnabled(enabled);
   }
 
-  /// Enable/disable voice feedback
+  /// Enables or disables voice feedback (TTS).
+  /// 
+  /// Persists the preference using [PreferencesService].
   Future<void> setVoiceEnabled(bool enabled) async {
     _voiceEnabled = enabled;
     await preferencesService.setVoiceEnabled(enabled);
   }
 
+  /// Returns true if sound effects are enabled.
   bool get isSoundEnabled => _soundEnabled;
+  
+  /// Returns true if voice feedback is enabled.
   bool get isVoiceEnabled => _voiceEnabled;
 
-  /// Speak text
+  /// Speaks the given [text] using TTS.
+  /// 
+  /// Does nothing if voice is disabled or text is empty.
+  /// Stops any currently playing speech before speaking new text.
   Future<void> speak(String text) async {
     if (!_voiceEnabled || text.isEmpty) return;
     await _tts.stop();
     await _tts.speak(text);
   }
 
-  /// Speak with localized guidance
+  /// Speaks a predefined guidance message identified by [part].
+  /// 
+  /// This is used for standard voice prompts like 'welcome', 'phone', etc.
   Future<void> speakGuidance(String part) async {
     // US2: Voice guidance for registration
     // In a real app, these would come from localization files
@@ -75,7 +96,10 @@ class AudioService {
     }
   }
 
-  /// Play sound effects
+  /// Plays a sound effect identified by [type].
+  /// 
+  /// Supported types: 'success', 'error', 'click'.
+  /// Uses placeholder URLs for now.
   Future<void> playSound(String type) async {
     if (!_soundEnabled) return;
 
@@ -100,7 +124,7 @@ class AudioService {
     }
   }
 
-  /// Confirm action with sound and message
+  /// Confirms an action by playing a sound and optionally speaking a message.
   Future<void> confirmAction(String type, {String? message}) async {
     await playSound(type);
     if (message != null) {
@@ -108,11 +132,12 @@ class AudioService {
     }
   }
 
-  /// Dispose resources
+  /// Disposes of audio resources.
   Future<void> dispose() async {
     await _tts.stop();
     await _audioPlayer.dispose();
   }
 }
 
+/// Global singleton instance of [AudioService].
 final audioService = AudioService();

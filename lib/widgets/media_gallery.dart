@@ -8,6 +8,10 @@ import '../core/theme/app_colors.dart';
 import '../models/pending_media.dart';
 import '../services/offline_storage_service.dart';
 
+/// A widget that displays a gallery of pending media uploads.
+/// 
+/// Shows images and videos that are waiting to be synced or have been saved offline.
+/// Allows deleting items from the queue.
 class MediaGallery extends StatefulWidget {
   const MediaGallery({super.key});
 
@@ -25,6 +29,7 @@ class _MediaGalleryState extends State<MediaGallery> {
     _loadItems();
   }
 
+  /// Loads pending media items from offline storage.
   Future<void> _loadItems() async {
     final items = await offlineStorageService.getAllPendingMedia();
     if (mounted) {
@@ -35,6 +40,7 @@ class _MediaGalleryState extends State<MediaGallery> {
     }
   }
 
+  /// Deletes a media item and refreshes the list.
   Future<void> _deleteItem(String id) async {
     await offlineStorageService.deletePendingMedia(id);
     _loadItems();
@@ -87,6 +93,7 @@ class _MediaGalleryState extends State<MediaGallery> {
     );
   }
 
+  /// Builds a single list item for a media file.
   Widget _buildMediaItem(PendingMedia item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -198,6 +205,10 @@ class _MediaGalleryState extends State<MediaGallery> {
       ),
     );
   }
+
+  /// Gets the image provider for the thumbnail.
+  /// 
+  /// Uses base64 content for web and file path for mobile/desktop.
   ImageProvider? _getImageProvider(PendingMedia item) {
     if (kIsWeb && item.base64Content != null && item.base64Content!.isNotEmpty) {
       try {

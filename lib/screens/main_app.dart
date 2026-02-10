@@ -25,8 +25,16 @@ import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
 import 'marketing_home_page.dart';
 
-/// MainApp - Main application container with flow management
-/// Matches React's MainAppFlow and CropDiagnosisApp components
+/// The main application widget that manages the high-level app state and navigation flow.
+/// 
+/// This component acts as the root navigator, switching between different screens based on:
+/// - Initialization status (loading)
+/// - Consent status (marketing -> consent)
+/// - Authentication status (login)
+/// - Language selection status
+/// - Main app navigation (home, camera, profile, etc.)
+/// 
+/// Equivalent to React's `MainAppFlow` and `CropDiagnosisApp` components.
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
@@ -35,7 +43,10 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp> {
+  // Current high-level state of the app
   String _appState = 'loading'; // loading, landing, consent, login, language, app, marketing
+  
+  // Current view within the 'app' state
   String _currentView = 'home';
   bool _isOnline = true;
 
@@ -45,6 +56,7 @@ class _MainAppState extends State<MainApp> {
     _initApp();
   }
 
+  /// Initializes core services and determines the initial app state.
   Future<void> _initApp() async {
     await preferencesService.init();
     await consentService.init();
@@ -62,11 +74,12 @@ class _MainAppState extends State<MainApp> {
     if (!mounted) return;
     
     setState(() {
-      _appState = hasConsent ? 'app' : 'marketing'; // Start with marketing page
+      _appState = hasConsent ? 'app' : 'marketing'; // Start with marketing page if no consent yet
       _isOnline = true; 
     });
   }
 
+  /// Handles the user choosing to continue as a guest.
   void _handleGuestContinue() async {
     await consentService.setGuestMode(true);
     if (!mounted) return;
@@ -75,12 +88,14 @@ class _MainAppState extends State<MainApp> {
     });
   }
 
+  /// Transitions to the login screen.
   void _handleLogin() {
     setState(() {
       _appState = 'login';
     });
   }
 
+  /// Handles the completion of the consent flow.
   void _handleConsentGiven() async {
     await consentService.giveConsent();
     
@@ -99,6 +114,9 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
+  /// Handles successful login or skipping login.
+  /// 
+  /// Checks for consent status again to ensure compliance even after login.
   void _handleLoginComplete() async {
     // US5: Explicitly require consent even after login
     // Don't auto-grant consent. Check if already given?
@@ -119,6 +137,7 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
+  /// Checks if a language is selected and navigates accordingly.
   void _checkLanguageAndProceed() {
     final languageProvider = context.read<LanguageProvider>();
     if (!languageProvider.isLanguageSelected) {
@@ -132,6 +151,7 @@ class _MainAppState extends State<MainApp> {
     }
   }
 
+  /// Handles language selection and transitions to the main app.
   void _handleLanguageSelect(String code) async {
     final languageProvider = context.read<LanguageProvider>();
     await languageProvider.setLanguage(code);
@@ -141,6 +161,7 @@ class _MainAppState extends State<MainApp> {
     });
   }
 
+  /// Navigates to a specific view within the main app.
   void _navigateTo(String view) {
     setState(() {
       _currentView = view;
@@ -221,6 +242,7 @@ class _MainAppState extends State<MainApp> {
     );
   }
 
+  /// Router for the specific view content within the main app layout.
   Widget _buildCurrentView() {
     switch (_currentView) {
       case 'home':
@@ -228,9 +250,6 @@ class _MainAppState extends State<MainApp> {
           onNavigate: _navigateTo,
           isOnline: _isOnline,
         );
-
-
-// ... (inside _buildCurrentView)
 
       case 'camera':
         return CameraCaptureView(

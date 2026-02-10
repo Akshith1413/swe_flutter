@@ -3,8 +3,13 @@ import '../core/theme/app_colors.dart';
 import '../core/constants/app_constants.dart';
 import '../core/localization/translation_service.dart';
 
-/// LandingPage - App entry screen
-/// Matches React's LandingPage.jsx
+/// The entry screen of the application.
+/// 
+/// Shows the app branding and provides options to:
+/// - Continue as a guest (Guest Mode)
+/// - Create an Account / Login
+/// 
+/// Equivalent to React's `LandingPage.jsx`.
 class LandingPage extends StatelessWidget {
   final VoidCallback onGuest;
   final VoidCallback onLogin;

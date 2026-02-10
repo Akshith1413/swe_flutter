@@ -2,6 +2,10 @@ import 'dart:math';
 import '../models/analysis_result.dart';
 import 'preferences_service.dart';
 
+/// Service for simulating crop disease analysis.
+/// 
+/// In a real application, this would upload images to a backend model.
+/// Currently, it mocks the analysis process with random results.
 class CropService {
   // Mock data for simulation
   final List<String> _crops = ['Tomato', 'Potato', 'Wheat', 'Rice', 'Corn'];
@@ -13,7 +17,12 @@ class CropService {
     'Corn': ['Rust', 'Leaf Blight', 'Healthy'],
   };
 
-  /// Simulate AI analysis of an image
+  /// Simulates analyzing an image to detect crop diseases.
+  /// 
+  /// - [imagePath]: Path to the image file.
+  /// 
+  /// Returns an [AnalysisResult] with simulated disease data.
+  /// Also saves the result to local history via [PreferencesService].
   Future<AnalysisResult> analyzeImage(String imagePath) async {
     // Simulate network delay
     await Future.delayed(const Duration(seconds: 2));

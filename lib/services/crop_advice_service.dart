@@ -2,12 +2,26 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/analysis_result.dart';
 
-/// CropAdviceService - Get AI-generated crop advice
-/// Integrates with backend LLM advice endpoint
+/// Service for retrieving crop advice from the backend LLM.
+/// 
+/// This service handles:
+/// - Sending analysis data (crop, disease, confidence) to the server.
+/// - Parsing the AI-generated advice (cause, symptoms, treatment).
+/// - Providing mock advice when offline or if the API fails.
 class CropAdviceService {
   static const String baseUrl = 'https://crop-aid-backend.onrender.com';
 
-  /// Get AI-generated crop advice
+  /// Fetches AI-generated advice for a specific crop disease.
+  /// 
+  /// Parameters:
+  /// - [crop]: Name of the crop.
+  /// - [disease]: Detected disease name.
+  /// - [severity]: Severity level of the disease.
+  /// - [confidence]: Confidence score of the detection.
+  /// - [apiKey]: Optional API key for authentication.
+  /// 
+  /// Returns an [AnalysisResult] containing the advice fields.
+  /// Falls back to mock data on error.
   static Future<AnalysisResult> getCropAdvice({
     required String crop,
     required String disease,
@@ -59,7 +73,7 @@ class CropAdviceService {
     }
   }
 
-  /// Get mock advice for offline/demo use
+  /// Generates mock advice for demonstration and offline usage.
   static AnalysisResult _getMockAdvice(
     String crop,
     String disease,

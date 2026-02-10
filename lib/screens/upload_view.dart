@@ -5,9 +5,13 @@ import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/audio_service.dart';
 
-/// Upload View - Upload multiple images from gallery for diagnosis
-/// US12: Upload multiple images with thumbnail carousel
-/// US16: Confirmation of captured input
+/// Upload View - Select multiple images from gallery for diagnosis.
+/// 
+/// User Stories Covered:
+/// - US12: Upload multiple images with thumbnail carousel.
+/// - US16: Confirmation of uploaded/selected media.
+/// 
+/// Matches React's `UploadView` component in `CropDiagnosisApp.jsx`.
 class UploadView extends StatefulWidget {
   final VoidCallback onBack;
   final Function(List<String> imagePaths) onUpload;
@@ -28,7 +32,11 @@ class _UploadViewState extends State<UploadView> {
   Map<String, Uint8List> _imagePreviews = {};
   bool _isLoading = false;
 
-  /// US12: Select multiple images
+  /// US12: Selects multiple images from the device gallery.
+  /// 
+  /// - Supports multi-selection (on supported platforms).
+  /// - Generates preview thumbnails.
+  /// - Plays audio feedback on selection.
   Future<void> _selectImages() async {
     setState(() => _isLoading = true);
 
@@ -62,7 +70,7 @@ class _UploadViewState extends State<UploadView> {
     }
   }
 
-  /// US12: Remove image from selection
+  /// US12: Removes a selected image from the list.
   void _removeImage(int index) {
     setState(() {
       final removed = _selectedImages.removeAt(index);
@@ -71,7 +79,10 @@ class _UploadViewState extends State<UploadView> {
     audioService.playSound('click');
   }
 
-  /// US12 & US16: Upload and confirm
+  /// US12 & US16: Confirms selection and proceeds to analysis.
+  /// 
+  /// - Provides visual (Snackbar) and audio feedback.
+  /// - Passes selected image paths to the callback.
   void _uploadImages() {
     if (_selectedImages.isEmpty) return;
 
@@ -199,6 +210,7 @@ class _UploadViewState extends State<UploadView> {
     );
   }
 
+  /// Builds the empty state UI prompting user to select images.
   Widget _buildEmptyState() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -259,7 +271,7 @@ class _UploadViewState extends State<UploadView> {
     );
   }
 
-  /// US12: Thumbnail preview carousel with remove option
+  /// US12: Builds a grid of selected image thumbnails with remove options.
   Widget _buildImageCarousel() {
     return Column(
       children: [

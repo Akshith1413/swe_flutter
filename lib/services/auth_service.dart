@@ -2,6 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+/// Service for handling user authentication via Firebase.
+/// 
+/// Supports:
+/// - Phone Number Authentication (OTP).
+/// - Mock authentication for testing or when Firebase is not configured.
+/// - User session management (listen to state changes, sign out).
 class AuthService {
   FirebaseAuth? _auth;
   bool _useMock = false;
@@ -26,7 +32,9 @@ class AuthService {
     }
   }
 
-  /// Stream of user state changes
+  /// Stream of user state changes.
+  /// 
+  /// Emits [User] when signed in, or null when signed out.
   Stream<User?> get userChanges {
     if (_useMock || _auth == null) {
       return const Stream.empty();
@@ -34,13 +42,19 @@ class AuthService {
     return _auth!.userChanges();
   }
 
-  /// Current user
+  /// Returns the current signed-in user, or null.
   User? get currentUser {
     if (_useMock || _auth == null) return null;
     return _auth!.currentUser;
   }
 
-  /// Send OTP to phone number
+  /// Sends an OTP to the provided [phoneNumber].
+  /// 
+  /// - [onCodeSent]: Callback when the code is sent successfully.
+  /// - [onVerificationFailed]: Callback when verification fails.
+  /// - [onVerificationCompleted]: Callback when verification is automatically completed.
+  /// 
+  /// In Mock mode, simulates sending a code immediately.
   Future<void> sendOtp({
     required String phoneNumber,
     required Function(String verificationId, int? resendToken) onCodeSent,
@@ -80,7 +94,10 @@ class AuthService {
     }
   }
 
-  /// Verify OTP and sign in
+  /// Verifies the [smsCode] entered by the user.
+  /// 
+  /// [verificationId] is obtained from [sendOtp].
+  /// In Mock mode, accepts '123456' as the valid code.
   Future<void> verifyOtp({
     required String verificationId,
     required String smsCode,
@@ -107,11 +124,12 @@ class AuthService {
     }
   }
 
-  /// Sign out
+  /// Signs out the current user.
   Future<void> signOut() async {
     if (_useMock || _auth == null) return;
     await _auth!.signOut();
   }
 }
 
+/// Global singleton instance of [AuthService].
 final authService = AuthService();
