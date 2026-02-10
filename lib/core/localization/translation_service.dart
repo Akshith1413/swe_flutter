@@ -17,10 +17,11 @@ class TranslationService {
     // Always load English as fallback first
     try {
       final englishJson = await rootBundle.loadString(
-        'translations/en.json',
+        'assets/translations/en.json',
       );
       _fallbackTranslations = json.decode(englishJson) as Map<String, dynamic>;
     } catch (e) {
+      debugPrint('Error loading fallback translations: $e');
       _fallbackTranslations = {};
     }
 
@@ -30,10 +31,11 @@ class TranslationService {
     } else {
       try {
         final jsonString = await rootBundle.loadString(
-          'translations/${locale.languageCode}.json',
+          'assets/translations/${locale.languageCode}.json',
         );
         _translations = json.decode(jsonString) as Map<String, dynamic>;
       } catch (e) {
+        debugPrint('Error loading translations for ${locale.languageCode}: $e');
         // Use English if translation file not found
         _translations = _fallbackTranslations;
       }
