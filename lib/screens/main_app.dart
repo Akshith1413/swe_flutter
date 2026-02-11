@@ -20,6 +20,7 @@ import 'settings_view.dart';
 import 'audio_settings_view.dart';
 import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
+import 'smart_camera_guide_view.dart';
 import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
@@ -247,8 +248,20 @@ class _MainAppState extends State<MainApp> {
     switch (_currentView) {
       case 'home':
         return HomeView(
-          onNavigate: _navigateTo,
+          onNavigate: (view) {
+            if (view == 'camera') {
+              _navigateTo('smart-camera-guide');
+            } else {
+              _navigateTo(view);
+            }
+          },
           isOnline: _isOnline,
+        );
+
+      case 'smart-camera-guide':
+        return SmartCameraGuideView(
+          onBack: () => _navigateTo('home'),
+          onStart: () => _navigateTo('camera'),
         );
 
       case 'camera':
@@ -270,6 +283,15 @@ class _MainAppState extends State<MainApp> {
               
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
+              
+              // US16: Confirmation
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Analysis saved to history'),
+                  backgroundColor: AppColors.nature600,
+                  duration: Duration(seconds: 2),
+                ),
+              );
               
               // Show Result
               await showModalBottomSheet(
@@ -335,6 +357,7 @@ class _MainAppState extends State<MainApp> {
         );
       case 'upload':
         return UploadView(
+          isOnline: _isOnline,
           onBack: () => _navigateTo('home'),
           onUpload: (paths) async {
             if (paths.isEmpty) return;

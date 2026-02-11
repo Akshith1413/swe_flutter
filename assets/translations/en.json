@@ -148,7 +148,11 @@
         "localStorage": "Local Storage",
         "localStorageDesc": "We store crop preferences on your device for a better experience.",
         "privacyNote": "We store plant images and crop preferences only to improve diagnosis accuracy.",
-        "agreeButton": "I Agree & Continue"
+        "agreeButton": "I Agree & Continue",
+        "checkboxLabel": "I have read and agree to the privacy policy and consent to data processing for crop diagnosis purposes.",
+        "mustAgree": "You must agree to continue",
+        "voiceGuide": "This screen explains how we use your data. We analyze plant images to detect diseases and store your preferences locally. Please read the information and check the consent box to continue.",
+        "replayAudio": "Replay Audio"
     },
     "loginScreen": {
         "title": "Farmer Login",
@@ -225,7 +229,18 @@
         "voiceOn": "Voice On",
         "voiceOff": "Voice Off",
         "grid": "Grid",
-        "alignPlant": "Align plant in frame"
+        "alignPlant": "Align plant in frame",
+        "aimAtPlant": "Aim at Plant",
+        "plantDetected": "Plant Detected",
+        "improveQuality": "Improve Quality",
+        "quality": "Quality",
+        "ready": "Ready",
+        "photographyTips": "Photography Tips",
+        "naturalLight": "Natural Light",
+        "steadyHand": "Steady Hand",
+        "fillFrame": "Fill Frame",
+        "cleanLens": "Clean Lens",
+        "continue": "Continue"
     },
     "uploadView": {
         "title": "Upload Images",
@@ -356,5 +371,19 @@
         "generating": "Generating Advice...",
         "howToUse": "How to Use",
         "instructions": "Enter the crop name and detected disease, then select severity and confidence level. Our AI will generate farmer-friendly advice including causes, symptoms, treatments, and prevention tips."
+    },
+    "smartCameraGuide": {
+        "title": "Smart Camera Guide",
+        "subtitle": "AI-powered assistance for perfect photos",
+        "autoLeafDetection": "Auto Leaf Detection",
+        "autoLeafDetectionDesc": "Green frame appears when leaf is detected",
+        "qualityMeter": "Quality Meter",
+        "qualityMeterDesc": "Real-time quality score and feedback",
+        "voiceGuidance": "Voice Guidance",
+        "voiceGuidanceDesc": "Audio prompts for perfect capture",
+        "qualityWarnings": "Quality Warnings",
+        "qualityWarningsDesc": "Alerts for blur, darkness, and other issues",
+        "startSmartCamera": "Start Smart Camera",
+        "getReady": "Get ready..."
     }
 }

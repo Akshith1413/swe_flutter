@@ -132,6 +132,16 @@ class AudioService {
     }
   }
 
+  /// Plays a click sound effect.
+  Future<void> playClick() async {
+    await playSound('click');
+  }
+
+  /// Plays a success sound effect.
+  Future<void> playSuccess() async {
+    await playSound('success');
+  }
+
   /// Disposes of audio resources.
   Future<void> dispose() async {
     await _tts.stop();

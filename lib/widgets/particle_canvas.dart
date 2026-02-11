@@ -50,7 +50,7 @@ class _ParticleCanvasState extends State<ParticleCanvas> with SingleTickerProvid
         }
         return CustomPaint(
           painter: _ParticlePainter(_particles),
-          child: Container(),
+          child: const SizedBox.expand(),
         );
       },
     );

@@ -72,7 +72,7 @@ class _HomeViewState extends State<HomeView> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header
               _buildHeader(context),
@@ -170,53 +170,61 @@ class _HomeViewState extends State<HomeView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            // App Icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+        Expanded(
+          child: Row(
+            children: [
+              // App Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.eco,
+                  size: 28,
+                  color: Colors.white,
+                ),
               ),
-              child: const Icon(
-                Icons.eco,
-                size: 28,
-                color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${context.t(_getGreetingKey())},',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.gray500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      context.t('homeView.userTitle'),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: AppColors.gray800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${context.t(_getGreetingKey())},',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.gray500,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  context.t('homeView.userTitle'),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.gray800,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
         Row(
           children: [
