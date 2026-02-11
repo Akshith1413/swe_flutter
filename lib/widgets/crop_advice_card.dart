@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme/app_colors.dart';
 import '../models/analysis_result.dart';
+import '../screens/chatbot_view.dart';
 
 /// A card widget that displays detailed AI-generated crop advice.
 /// 
@@ -13,11 +14,13 @@ import '../models/analysis_result.dart';
 class CropAdviceCard extends StatefulWidget {
   final AnalysisResult result;
   final VoidCallback onClose;
+  final VoidCallback? onChatbotTap;
 
   const CropAdviceCard({
     super.key,
     required this.result,
     required this.onClose,
+    this.onChatbotTap,
   });
 
   @override
@@ -73,6 +76,25 @@ PREVENTION: ${widget.result.prevention}
         return AppColors.amber50;
       default:
         return AppColors.nature50;
+    }
+  }
+
+  void _openChatbot() {
+    final onChatbotTap = widget.onChatbotTap;
+    if (onChatbotTap != null) {
+      Navigator.pop(context);
+      Future.delayed(const Duration(milliseconds: 350), () {
+        onChatbotTap();
+      });
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => ChatbotView(
+          onClose: () => Navigator.pop(ctx),
+        ),
+      );
     }
   }
 
@@ -301,6 +323,40 @@ PREVENTION: ${widget.result.prevention}
                   ),
                 ),
                 const SizedBox(height: 24),
+              ],
+            ),
+          ),
+          // Chatbot section - fixed at bottom, always visible
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Need more help from experts?",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 15),
+                ElevatedButton.icon(
+                  onPressed: _openChatbot,
+                  icon: const Icon(Icons.chat),
+                  label: const Text("Ask Farming Expert Chatbot"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
               ],
             ),
           ),
