@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
