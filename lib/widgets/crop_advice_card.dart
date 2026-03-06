@@ -342,3 +342,14 @@ Analysis: ${widget.result.cause}
       case 'severe':
       case 'high':
         return Colors.redAccent;
+      case 'moderate':
+      case 'medium':
+        return Colors.amberAccent;
+      case 'low':
+      case 'healthy':
+        return Colors.greenAccent;
+      default:
+        return Colors.blueAccent;
+    }
+  }
+}
