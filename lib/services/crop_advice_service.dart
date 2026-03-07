@@ -70,6 +70,20 @@ class CropAdviceService {
                   data['organic'] ?? 'Use neem-based solutions',
                   data['prevention'] ?? 'Maintain proper crop hygiene'
                 ],
+          organicSteps: data['organicSteps'] != null
+              ? List<String>.from(data['organicSteps'] as List)
+              : [
+                  "Spray neem oil every 5–7 days",
+                  "Use baking soda solution (1 tsp per liter)",
+                  "Improve soil drainage",
+                ],
+          chemicalSteps: data['chemicalSteps'] != null
+              ? List<String>.from(data['chemicalSteps'] as List)
+              : [
+                  "Apply chlorothalonil fungicide",
+                  "Use copper-based fungicide spray",
+                  "Repeat treatment every 7–10 days"
+                ],
         );
       } else {
         // Return mock data if API fails (for demo purposes)
@@ -108,6 +122,16 @@ class CropAdviceService {
         "Apply fungicide spray every 7-10 days if symptoms persist.",
         "Monitor plants regularly for new spots and overall health.",
         "Sterilize all gardening tools after use."
+      ],
+      organicSteps: [
+        "Spray neem oil every 5–7 days",
+        "Use baking soda solution (1 tsp per liter)",
+        "Improve soil drainage",
+      ],
+      chemicalSteps: [
+        "Apply chlorothalonil fungicide",
+        "Use copper-based fungicide spray",
+        "Repeat treatment every 7–10 days"
       ],
     );
   }
