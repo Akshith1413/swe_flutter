@@ -64,3 +64,4 @@ flutter:
   assets:
     - assets/translations/
     - assets/data/region_advice.json
+    - assets/data/treatment_database.json

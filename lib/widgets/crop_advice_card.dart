@@ -9,6 +9,8 @@ import '../services/preferences_service.dart';
 import '../services/tts_service.dart';
 import '../services/translation_service.dart';
 import '../services/region_service.dart';
+import '../services/preferences_service.dart';
+import '../services/treatment_service.dart';
 
 /// A sophisticated advice card matching the React application's high-end UI.
 /// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
@@ -35,6 +37,7 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
   bool _isTranslating = false;
   String? _regionAdvice;
   String? _translatedRegionAdvice;
+  Map<String, dynamic>? _structuredTreatments;
 
   @override
   void initState() {
@@ -57,13 +60,19 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
       _translatedChemicalSteps = await _translateList(widget.result.chemicalSteps);
     }
 
-    // Fetch Regional Advice
+    // Fetch Current Region for localized advice and dosage
     final region = await preferencesService.getRegion() ?? 'Tamil Nadu';
     _regionAdvice = await RegionService.getRegionAdvice(region, widget.result.disease);
     
     if (_regionAdvice != null && !_targetLanguage.startsWith('en')) {
       _translatedRegionAdvice = await TranslationService.translate(_regionAdvice!, _targetLanguage);
     }
+
+    // Fetch Structured Dosage Treatments
+    _structuredTreatments = await TreatmentService.getTreatment(
+      widget.result.disease,
+      region: region,
+    );
 
     if (mounted) {
       setState(() => _isTranslating = false);
@@ -247,13 +256,19 @@ Analysis: ${widget.result.cause}
 
                   // Organic Treatment Section
                   _buildSectionTitle(Icons.eco, 'Organic Treatment', const Color(0xFF10B981)),
-                  _buildStepsList(_translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps),
+                  _buildStepsList(
+                    _translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps,
+                    type: 'organic',
+                  ),
 
                   const SizedBox(height: 24),
 
                   // Chemical Treatment Section
                   _buildSectionTitle(Icons.science, 'Chemical Treatment', Colors.orangeAccent),
-                  _buildStepsList(_translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps),
+                  _buildStepsList(
+                    _translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps,
+                    type: 'chemical',
+                  ),
 
                   const SizedBox(height: 24),
 
@@ -423,60 +438,144 @@ Analysis: ${widget.result.cause}
     return _buildStepsList(steps);
   }
 
-  Widget _buildStepsList(List<String> steps) {
-    if (steps.isEmpty) {
+  Widget _buildStepsList(List<String> steps, {String type = 'organic'}) {
+    final structuredList = _structuredTreatments != null ? _structuredTreatments![type] as List? : null;
+
+    if (steps.isEmpty && (structuredList == null || structuredList.isEmpty)) {
       return _buildGlassInfoCard('No steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
     }
 
     return Column(
-      children: List.generate(steps.length, (index) {
-        final stepNumber = index + 1;
-        final stepText = steps[index];
+      children: [
+        if (structuredList != null && structuredList.isNotEmpty)
+          ...structuredList.map((item) {
+            final name = item['name'] as String;
+            final dosage = item['dosage'] as String;
+            final frequency = item['frequency'] as String;
+            
+            return _buildDosageCard(name, dosage, frequency);
+          }).toList(),
+        
+        ...List.generate(steps.length, (index) {
+          final stepNumber = index + 1;
+          final stepText = steps[index];
 
-        return GestureDetector(
-          onTap: () {
-            TTSService.speakText(stepText, _targetLanguage);
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.blueGrey.shade900,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+          return GestureDetector(
+            onTap: () {
+              TTSService.speakText(stepText, _targetLanguage);
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade900,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: const Color(0xFF10B981),
+                    child: Text(
+                      "$stepNumber",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      stepText,
+                      style: TextStyle(
+                        color: _isTranslating ? Colors.white38 : Colors.white,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.volume_up, size: 18, color: Colors.white24),
+                ],
+              ),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Colors.green,
-                  child: Text(
-                    "$stepNumber",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDosageCard(String name, String dosage, String frequency) {
+    final speechText = "Apply $name. Dosage $dosage. Repeat $frequency.";
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () => TTSService.speakText(speechText, _targetLanguage),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.medication, color: Colors.greenAccent, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    stepText,
-                    style: TextStyle(
-                      color: _isTranslating ? Colors.white38 : Colors.white,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.volume_up, size: 18, color: Colors.white24),
-              ],
+                  Icon(Icons.volume_up, color: Colors.white.withOpacity(0.5), size: 18),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildDosageInfoRow(Icons.science_outlined, "Dosage: ", dosage),
+              const SizedBox(height: 4),
+              _buildDosageInfoRow(Icons.event_repeat, "Frequency: ", frequency),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDosageInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.greenAccent.withOpacity(0.7), size: 14),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
             ),
           ),
-        );
-      }),
+        ),
+      ],
     );
   }
 
