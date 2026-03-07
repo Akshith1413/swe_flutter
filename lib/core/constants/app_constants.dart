@@ -15,8 +15,8 @@ class AppConstants {
   // Border Radius
   static const double radiusSmall = 8.0;
   static const double radiusMedium = 12.0;
-  static const double radiusLarge = 16.0;
-  static const double radiusXLarge = 20.0;
+  static const double radiusLarge = 24.0;
+  static const double radiusXLarge = 32.0;
   static const double radiusRound = 50.0;
 
   // Spacing
@@ -41,6 +41,8 @@ class AppConstants {
   static const double desktopBreakpoint = 1200.0;
 
   // API
-  static const String baseApiUrl = 'https://your-api-url.com';
+  // static const String baseApiUrl = 'https://your-api-url.com';
+  // Use local backend for development
+  static const String baseApiUrl = 'http://localhost:5000';
   static const Duration apiTimeout = Duration(seconds: 30);
 }

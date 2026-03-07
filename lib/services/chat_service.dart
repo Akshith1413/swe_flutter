@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'crop_advice_service.dart';
+import '../core/constants/app_constants.dart';
 
 /// System prompt for CropAID agriculture assistant persona.
 const String _systemPrompt = '''You are CropAID – Smart Farming Assistant. You answer ONLY agriculture-related topics such as: crop diseases, pest control, soil health, irrigation, fertilizers, weather impact on crops, organic farming, crop rotation, plant health, and yield improvement. If the user asks a non-farming question, politely respond that you are here to help with farming and agriculture only. Keep responses helpful, clear, and concise.''';
@@ -8,7 +9,8 @@ const String _systemPrompt = '''You are CropAID – Smart Farming Assistant. You
 /// Service for the in-app farming chatbot.
 /// Integrates with backend LLM for dynamic, contextual responses.
 class ChatService {
-  static const String _baseUrl = 'https://crop-aid-backend.onrender.com';
+  // Use centralized base API URL
+  static String get _baseUrl => AppConstants.baseApiUrl;
 
   /// Gets a dynamic LLM response for the user's question.
   /// Uses chat API when available, otherwise falls back to llm-advice with question as context.
@@ -31,7 +33,7 @@ class ChatService {
   static Future<String?> _tryChatApi(String message) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/chat'),
+        Uri.parse('$_baseUrl/api/crop-advice/chat'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'message': message,

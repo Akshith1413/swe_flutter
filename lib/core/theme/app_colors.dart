@@ -6,6 +6,52 @@ class AppColors {
   AppColors._();
 
   // ============================================
+  // PREMIUM LIGHT PALETTE
+  // ============================================
+  static const Color premiumMint = Color(0xFFF0FDF4); // bg-green-50
+  static const Color premiumBg = Color(0xFFF8FAF9);
+  static const Color premiumEmerald = Color(0xFF059669); // emerald-600
+  static const Color premiumTeal = Color(0xFF14B8A6); // teal-500
+  static const Color premiumSlate800 = Color(0xFF1E293B); // text-slate-800
+  static const Color premiumSlate500 = Color(0xFF64748B); // text-slate-500
+  static const Color premiumSlate100 = Color(0xFFF1F5F9); // bg-slate-100
+
+  // Premium Gradients
+  static const LinearGradient premiumGreenGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF059669), Color(0xFF10B981)],
+  );
+
+  static const LinearGradient premiumSkyGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
+  );
+
+  static const LinearGradient premiumSurfaceGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Colors.white, Color(0xFFF8FAFC)],
+  );
+
+  static const List<BoxShadow> premiumShadow = [
+    BoxShadow(
+      color: Color(0x0F000000),
+      blurRadius: 20,
+      offset: Offset(0, 8),
+    ),
+  ];
+
+  static const List<BoxShadow> premiumActiveShadow = [
+    BoxShadow(
+      color: Color(0x1F059669),
+      blurRadius: 24,
+      offset: Offset(0, 12),
+    ),
+  ];
+
+  // ============================================
   // PRIMARY GRADIENT COLORS (from CSS)
   // ============================================
   static const Color primaryGreen = Color(0xFF0F5132);
