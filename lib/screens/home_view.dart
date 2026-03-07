@@ -3,6 +3,9 @@ import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
 import '../services/offline_storage_service.dart';
+import '../services/preferences_service.dart';
+import '../services/location_service.dart';
+import '../services/region_service.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -38,6 +41,104 @@ class _HomeViewState extends State<HomeView> {
     super.initState();
     _checkGuestMode();
     _loadPendingSyncCount();
+    _checkRegionSetup();
+  }
+
+  /// US27: Checks if region is set, if not, prompts user.
+  Future<void> _checkRegionSetup() async {
+    final region = await preferencesService.getRegion();
+    if (region == null) {
+      // Delay slightly to ensure UI is ready
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          _showRegionSetupDialog();
+        }
+      });
+    }
+  }
+
+  Future<void> _showRegionSetupDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Localize Your Advice'),
+        content: const Text(
+          'To provide treatment advice specific to your regional climate, we need to know your state. Would you like to auto-detect your location or select manually?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showManualRegionSelection();
+            },
+            child: const Text('Select Manually'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _autoDetectRegion();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.nature600),
+            child: const Text('Auto-detect', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showManualRegionSelection() async {
+    final List<String> regions = ['Tamil Nadu', 'Punjab', 'Maharashtra'];
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select State'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: regions.map((r) => ListTile(
+            title: Text(r),
+            onTap: () => Navigator.pop(context, r),
+          )).toList(),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await preferencesService.setRegion(result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Region set to $result')),
+      );
+    }
+  }
+
+  Future<void> _autoDetectRegion() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Detecting your location...'), duration: Duration(seconds: 2)),
+      );
+
+      final position = await LocationService.getCurrentPosition();
+      final region = RegionService.getRegionFromCoordinates(position.latitude, position.longitude);
+
+      if (region != null && mounted) {
+        await preferencesService.setRegion(region);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Detected Region: $region')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not determine region. Please select manually.')),
+        );
+        _showManualRegionSelection();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location error: $e')),
+        );
+        _showManualRegionSelection();
+      }
+    }
   }
 
   /// Checks if the user is in guest mode to display the banner.

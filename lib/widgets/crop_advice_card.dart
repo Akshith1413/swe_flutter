@@ -8,6 +8,7 @@ import '../models/analysis_result.dart';
 import '../services/preferences_service.dart';
 import '../services/tts_service.dart';
 import '../services/translation_service.dart';
+import '../services/region_service.dart';
 
 /// A sophisticated advice card matching the React application's high-end UI.
 /// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
@@ -32,6 +33,8 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
   List<String> _translatedChemicalSteps = [];
   String _targetLanguage = 'en-US';
   bool _isTranslating = false;
+  String? _regionAdvice;
+  String? _translatedRegionAdvice;
 
   @override
   void initState() {
@@ -52,6 +55,14 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
       _translatedSteps = await _translateList(widget.result.treatmentSteps);
       _translatedOrganicSteps = await _translateList(widget.result.organicSteps);
       _translatedChemicalSteps = await _translateList(widget.result.chemicalSteps);
+    }
+
+    // Fetch Regional Advice
+    final region = await preferencesService.getRegion() ?? 'Tamil Nadu';
+    _regionAdvice = await RegionService.getRegionAdvice(region, widget.result.disease);
+    
+    if (_regionAdvice != null && !_targetLanguage.startsWith('en')) {
+      _translatedRegionAdvice = await TranslationService.translate(_regionAdvice!, _targetLanguage);
     }
 
     if (mounted) {
@@ -244,7 +255,23 @@ Analysis: ${widget.result.cause}
                   _buildSectionTitle(Icons.science, 'Chemical Treatment', Colors.orangeAccent),
                   _buildStepsList(_translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+
+                  // Regional Advice Section
+                  if (_regionAdvice != null) ...[
+                    _buildSectionTitle(Icons.map_outlined, 'Regional Advice', Colors.cyanAccent),
+                    GestureDetector(
+                      onTap: () {
+                        TTSService.speakText(_translatedRegionAdvice ?? _regionAdvice!, _targetLanguage);
+                      },
+                      child: _buildGlassInfoCard(
+                        _translatedRegionAdvice ?? _regionAdvice!,
+                        icon: Icons.info_outline,
+                        iconColor: Colors.cyanAccent,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
 
                   // Bottom Action
                   SizedBox(
