@@ -80,111 +80,59 @@ class CropService {
       prediction = await AIPredictionService.predict(imageBytes);
     } catch (e) {
       debugPrint('AI prediction request failed: $e');
+      throw Exception('Could not connect to AI service. Please check your internet connection.');
     }
 
-    // Check if we have a valid AI response
+    // 3. Handle explicit AI rejection (e.g., non-leaf)
+    if (prediction != null && prediction["success"] == false) {
+      final errorMsg = prediction["error"] ?? "Could not identify a leaf in the image.";
+      throw Exception(errorMsg);
+    }
+
+    // 4. Check if we have a valid AI response with class_index
     if (prediction != null && prediction.containsKey("class_index")) {
-      try {
-        // 3. Extract the prediction
-        final int classIndex = prediction["class_index"];
-        final double confidence = prediction["confidence"];
+      // 5. Extract the prediction
+      final int classIndex = prediction["class_index"];
+      final double confidence = prediction["confidence"];
 
-        // 4. Map class_index to deterministic disease name
-        final String diseaseName = classLabels[classIndex];
-        
-        print("Predicted disease: $diseaseName");
-        print("Confidence: $confidence");
-
-        // 5. Extract crop name for context
-        final String cropName = diseaseName.split('___').first.replaceAll('_', ' ');
-
-        // 6. Call the CropAdviceService with mapped disease name
-        final result = await CropAdviceService.getCropAdvice(
-          crop: cropName,
-          disease: diseaseName,
-          severity: confidence > 0.7 ? "Moderate" : "Low",
-          confidence: confidence,
-        );
-
-        // Update image URL to the local path and finalize details
-        final finalResult = result.copyWith(
-          imageUrl: imagePath,
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          date: DateTime.now(),
-        );
-
-        // Save to history
-        await preferencesService.saveAnalysisResult(finalResult.toJson());
-
-        return finalResult;
-      } catch (e) {
-        debugPrint('Error processing AI prediction: $e');
-        // Fallthrough to mock fallback if processing fails
+      // 6. Strict Confidence Threshold (User-requested feature)
+      // If confidence is too low, it's likely not a leaf or a very ambiguous case.
+      if (confidence < 0.50) {
+        throw Exception("Low confidence detection (${(confidence * 100).toStringAsFixed(0)}%). Please retake the photo with better lighting and ensure the leaf is centered.");
       }
+
+      // 7. Map class_index to deterministic disease name
+      final String diseaseName = classLabels[classIndex];
+      
+      print("Predicted disease: $diseaseName");
+      print("Confidence: $confidence");
+
+      // 8. Extract crop name for context
+      final String cropName = diseaseName.split('___').first.replaceAll('_', ' ');
+
+      // 9. Call the CropAdviceService with mapped disease name
+      final result = await CropAdviceService.getCropAdvice(
+        crop: cropName,
+        disease: diseaseName,
+        severity: confidence > 0.8 ? "High" : (confidence > 0.6 ? "Moderate" : "Low"),
+        confidence: confidence,
+      );
+
+      // 10. Update image URL to the local path and finalize details
+      final finalResult = result.copyWith(
+        imageUrl: imagePath,
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        date: DateTime.now(),
+      );
+
+      // Save to history
+      await preferencesService.saveAnalysisResult(finalResult.toJson());
+
+      return finalResult;
     }
 
-    // 7. Robust Fallback (Mock) - Only executed if AI fails or errors
-    debugPrint('Falling back to mock prediction logic');
-    final random = Random();
-    final crop = _crops[random.nextInt(_crops.length)];
-    final diseaseList = _diseases[crop]!;
-    final disease = diseaseList[random.nextInt(diseaseList.length)];
-    final isHealthy = disease == 'Healthy';
-    
-    final result = AnalysisResult(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: DateTime.now(),
-      imageUrl: imagePath,
-      crop: crop,
-      disease: disease,
-      confidence: 0.70 + (random.nextDouble() * 0.29),
-      severity: isHealthy ? 'None' : ['Low', 'Moderate', 'High'][random.nextInt(3)],
-      cause: isHealthy 
-          ? 'Plant appears to be in good health.'
-          : 'Fungal infection caused by Alternaria solani, often triggered by warm, humid weather.',
-      symptoms: isHealthy
-          ? 'Leaves are green and vibrant. No signs of spots or wilting.'
-          : 'Dark, concentric rings on older leaves, yellowing tissue, and premature leaf drop.',
-      immediate: isHealthy
-          ? 'Continue regular care routine.'
-          : 'Remove infected leaves immediately. Improve air circulation around plants.',
-      chemical: isHealthy
-          ? 'None required.'
-          : 'Apply fungicides containing chlorothalonil or copper. Spray every 7-10 days.',
-      organic: isHealthy
-          ? 'Use compost tea for preventative care.'
-          : 'Spray with neem oil or baking soda solution (1 tbsp baking soda, 1 tsp oil, 1 tsp soap per gallon of water).',
-      prevention: isHealthy
-          ? 'Ensure proper watering and spacing.'
-          : 'Rotate crops every 2-3 years. Mulch to prevent soil splash. Water at the base of the plant.',
-      treatmentSteps: isHealthy 
-          ? ["Continue regular care routine.", "Ensure proper watering and spacing."]
-          : [
-              "Remove infected leaves immediately.",
-              "Improve air circulation around plants.",
-              "Apply fungicide spray every 7-10 days.",
-              "Monitor plants regularly for new spots."
-            ],
-      organicSteps: isHealthy
-          ? ["Use compost tea for preventative care."]
-          : [
-              "Spray neem oil every 5–7 days",
-              "Use baking soda solution (1 tsp per liter)",
-              "Improve soil drainage",
-            ],
-      chemicalSteps: isHealthy
-          ? ["No chemical treatment needed for healthy plants."]
-          : [
-              "Apply chlorothalonil fungicide",
-              "Use copper-based fungicide spray",
-              "Repeat treatment every 7–10 days"
-            ],
-    );
-
-    // Save to history
-    await preferencesService.saveAnalysisResult(result.toJson());
-
-    return result;
+    // 11. Final fallback for unexpected states
+    throw Exception('An unexpected error occurred during analysis. Please try again.');
   }
 }
 

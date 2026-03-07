@@ -4,7 +4,7 @@ import '../core/theme/app_colors.dart';
 import '../core/providers/language_provider.dart';
 import '../services/consent_service.dart';
 import '../services/preferences_service.dart';
-import '../services/crop_service.dart';
+import '../services/crop_service.dart' hide preferencesService;
 import '../widgets/crop_advice_card.dart';
 import 'landing_page.dart';
 import 'consent_screen.dart';
@@ -327,8 +327,35 @@ class _MainAppState extends State<MainApp> {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
               
+              final errorStr = e.toString();
+              
+              // Handle identification failures (Low confidence or Non-leaf) with a clear dialog
+              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
+                 showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        SizedBox(width: 10),
+                        Text('Identification Failed'),
+                      ],
+                    ),
+                    content: Text(errorStr.replaceFirst('Exception: ', '')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
               // US15: Offline Fallback - Save to PendingMedia
               try {
+                // ... (rest of offline logic remains same)
                 final media = PendingMedia(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   filePath: path,
@@ -433,6 +460,31 @@ class _MainAppState extends State<MainApp> {
             } catch (e) {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
+              
+              final errorStr = e.toString();
+              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
+                 showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        SizedBox(width: 10),
+                        Text('Identification Failed'),
+                      ],
+                    ),
+                    content: Text(errorStr.replaceFirst('Exception: ', '')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Error analyzing images: $e')),
               );
