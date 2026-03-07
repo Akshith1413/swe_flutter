@@ -187,7 +187,7 @@ class _MarketingHomePageState extends State<MarketingHomePage> {
           fontSize: isDesktop ? 72 : 48,
           fontWeight: FontWeight.w800,
           height: 1.1,
-          color: Colors.transparent,
+          color: Colors.white,
           shadows: [
             Shadow(
               color: AppColors.accentGreen.withOpacity(0.5),
@@ -539,6 +539,7 @@ class _MarketingHomePageState extends State<MarketingHomePage> {
 extension GradientText on Text {
   Widget gradient(Gradient gradient) {
     return ShaderMask(
+      blendMode: BlendMode.srcIn,
       shaderCallback: (bounds) => gradient.createShader(
         Rect.fromLTWH(0, 0, bounds.width, bounds.height),
       ),

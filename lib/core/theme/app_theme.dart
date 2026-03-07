@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../constants/app_constants.dart';
 import 'app_colors.dart';
 
 /// CropAId App Theme
@@ -15,36 +16,37 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: ColorScheme.light(
-        primary: AppColors.primaryGreen,
-        secondary: AppColors.secondaryGreen,
+        primary: AppColors.premiumEmerald,
+        secondary: AppColors.premiumTeal,
         tertiary: AppColors.accentGreen,
         surface: AppColors.white,
+        onSurface: AppColors.premiumSlate800,
         error: AppColors.error,
       ),
-      scaffoldBackgroundColor: AppColors.nature50,
+      scaffoldBackgroundColor: AppColors.premiumBg,
       textTheme: _textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.gray800,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: AppColors.premiumSlate800,
         ).copyWith(
           // US3: Fallback for Indic languages
           fontFamilyFallback: ['Noto Sans', 'Arial', 'sans-serif'],
         ),
-        iconTheme: const IconThemeData(color: AppColors.gray600),
+        iconTheme: const IconThemeData(color: AppColors.premiumSlate800),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.nature600,
+          backgroundColor: AppColors.premiumEmerald,
           foregroundColor: AppColors.white,
-          elevation: 2,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppConstants.radiusLarge / 1.5),
           ),
           textStyle: GoogleFonts.inter(
             fontSize: 16,
@@ -54,39 +56,40 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primaryGreen,
-          side: const BorderSide(color: AppColors.nature200),
+          foregroundColor: AppColors.premiumEmerald,
+          side: const BorderSide(color: AppColors.premiumSlate100),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppConstants.radiusLarge / 1.5),
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.gray200),
+          borderRadius: BorderRadius.circular(AppConstants.radiusLarge / 1.5),
+          borderSide: BorderSide(color: AppColors.premiumSlate100),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.gray200),
+          borderRadius: BorderRadius.circular(AppConstants.radiusLarge / 1.5),
+          borderSide: BorderSide(color: AppColors.premiumSlate100),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.secondaryGreen, width: 2),
+          borderRadius: BorderRadius.circular(AppConstants.radiusLarge / 1.5),
+          borderSide: const BorderSide(color: AppColors.premiumEmerald, width: 2),
         ),
         hintStyle: GoogleFonts.inter(
-          color: AppColors.gray400,
+          color: AppColors.premiumSlate500,
           fontSize: 16,
         ),
       ),
       cardTheme: const CardThemeData(
-        elevation: 2,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusLarge)),
+          side: BorderSide(color: Color(0x0A000000)), // Very subtle border
         ),
         color: AppColors.white,
       ),
