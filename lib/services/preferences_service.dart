@@ -10,6 +10,7 @@ class PreferencesService {
   static const String _soundEnabledKey = 'sound_enabled';
   static const String _voiceEnabledKey = 'voice_enabled';
   static const String _onboardingCompleteKey = 'onboarding_complete';
+  static const String _regionKey = 'user_region';
 
   SharedPreferences? _prefs;
 
@@ -53,6 +54,19 @@ class PreferencesService {
   Future<void> setLanguage(String code) async {
     final p = await prefs;
     await p.setString(_languageKey, code);
+  }
+
+  // ============================================
+  // REGION
+  // ============================================
+  Future<String?> getRegion() async {
+    final p = await prefs;
+    return p.getString(_regionKey);
+  }
+
+  Future<void> setRegion(String region) async {
+    final p = await prefs;
+    await p.setString(_regionKey, region);
   }
 
   // ============================================
@@ -151,3 +165,5 @@ class PreferencesService {
 
 /// Global singleton instance
 final preferencesService = PreferencesService();
+
+// Unit 158 by Akshith1413

@@ -43,6 +43,15 @@ class AnalysisResult {
   /// Preventive measures to avoid future occurrences.
   final String prevention;
 
+  /// Step-by-step treatment instructions.
+  final List<String> treatmentSteps;
+
+  /// Organic treatment steps.
+  final List<String> organicSteps;
+
+  /// Chemical treatment steps.
+  final List<String> chemicalSteps;
+
   /// Creates an [AnalysisResult] instance.
   AnalysisResult({
     required this.id,
@@ -58,6 +67,9 @@ class AnalysisResult {
     required this.chemical,
     required this.organic,
     required this.prevention,
+    required this.treatmentSteps,
+    required this.organicSteps,
+    required this.chemicalSteps,
   });
 
   /// Converts the [AnalysisResult] instance to a JSON map.
@@ -76,6 +88,9 @@ class AnalysisResult {
       'chemical': chemical,
       'organic': organic,
       'prevention': prevention,
+      'treatmentSteps': treatmentSteps,
+      'organicSteps': organicSteps,
+      'chemicalSteps': chemicalSteps,
     };
   }
 
@@ -95,6 +110,54 @@ class AnalysisResult {
       chemical: json['chemical'] ?? '',
       organic: json['organic'] ?? '',
       prevention: json['prevention'] ?? '',
+      treatmentSteps: json['treatmentSteps'] != null 
+          ? List<String>.from(json['treatmentSteps']) 
+          : [],
+      organicSteps: json['organicSteps'] != null
+          ? List<String>.from(json['organicSteps'])
+          : [],
+      chemicalSteps: json['chemicalSteps'] != null
+          ? List<String>.from(json['chemicalSteps'])
+          : [],
+    );
+  }
+
+  /// Creates a copy of this [AnalysisResult] with the given fields replaced.
+  AnalysisResult copyWith({
+    String? id,
+    DateTime? date,
+    String? imageUrl,
+    String? crop,
+    String? disease,
+    double? confidence,
+    String? severity,
+    String? cause,
+    String? symptoms,
+    String? immediate,
+    String? chemical,
+    String? organic,
+    String? prevention,
+    List<String>? treatmentSteps,
+    List<String>? organicSteps,
+    List<String>? chemicalSteps,
+  }) {
+    return AnalysisResult(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      imageUrl: imageUrl ?? this.imageUrl,
+      crop: crop ?? this.crop,
+      disease: disease ?? this.disease,
+      confidence: confidence ?? this.confidence,
+      severity: severity ?? this.severity,
+      cause: cause ?? this.cause,
+      symptoms: symptoms ?? this.symptoms,
+      immediate: immediate ?? this.immediate,
+      chemical: chemical ?? this.chemical,
+      organic: organic ?? this.organic,
+      prevention: prevention ?? this.prevention,
+      treatmentSteps: treatmentSteps ?? this.treatmentSteps,
+      organicSteps: organicSteps ?? this.organicSteps,
+      chemicalSteps: chemicalSteps ?? this.chemicalSteps,
     );
   }
 }

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'chatbot_view.dart';
 import '../core/theme/app_colors.dart';
 import '../core/providers/language_provider.dart';
 import '../services/consent_service.dart';
 import '../services/preferences_service.dart';
-import '../services/crop_service.dart';
+import '../services/crop_service.dart' hide preferencesService;
 import '../widgets/crop_advice_card.dart';
 import 'landing_page.dart';
 import 'consent_screen.dart';
@@ -21,6 +20,7 @@ import 'settings_view.dart';
 import 'audio_settings_view.dart';
 import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
+import 'smart_camera_guide_view.dart';
 import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
@@ -237,77 +237,9 @@ class _MainAppState extends State<MainApp> {
     );
   }
 
-  bool _isChatOpen = false;
-
-  void _toggleChatbot() {
-    if (_isChatOpen) {
-      Navigator.pop(context);
-      setState(() => _isChatOpen = false);
-    } else {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => ChatbotView(
-          onClose: () {
-            Navigator.pop(context);
-            setState(() => _isChatOpen = false);
-          },
-        ),
-      ).whenComplete(() {
-        if (mounted) setState(() => _isChatOpen = false);
-      });
-      setState(() => _isChatOpen = true);
-    }
-  }
-
-  Widget _buildFloatingChatButton() {
-    return Positioned(
-      right: 20,
-      bottom: MediaQuery.of(context).padding.bottom + 20,
-      child: AnimatedScale(
-        scale: 1,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _toggleChatbot,
-            borderRadius: BorderRadius.circular(28),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF16A34A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF16A34A).withOpacity(0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 28),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMainApp() {
     return Scaffold(
-      body: Stack(
-        children: [
-          _buildCurrentView(),
-          _buildFloatingChatButton(),
-        ],
-      ),
+      body: _buildCurrentView(),
     );
   }
 
@@ -316,8 +248,20 @@ class _MainAppState extends State<MainApp> {
     switch (_currentView) {
       case 'home':
         return HomeView(
-          onNavigate: _navigateTo,
+          onNavigate: (view) {
+            if (view == 'camera') {
+              _navigateTo('smart-camera-guide');
+            } else {
+              _navigateTo(view);
+            }
+          },
           isOnline: _isOnline,
+        );
+
+      case 'smart-camera-guide':
+        return SmartCameraGuideView(
+          onBack: () => _navigateTo('home'),
+          onStart: () => _navigateTo('camera'),
         );
 
       case 'camera':
@@ -339,6 +283,15 @@ class _MainAppState extends State<MainApp> {
               
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
+              
+              // US16: Confirmation
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Analysis saved to history'),
+                  backgroundColor: AppColors.nature600,
+                  duration: Duration(seconds: 2),
+                ),
+              );
               
               // Show Result
               await showModalBottomSheet(
@@ -362,7 +315,6 @@ class _MainAppState extends State<MainApp> {
                     child: CropAdviceCard(
                       result: result,
                       onClose: () => Navigator.pop(context),
-                      onChatbotTap: _toggleChatbot,
                     ),
                   ),
                 ),
@@ -375,8 +327,35 @@ class _MainAppState extends State<MainApp> {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
               
+              final errorStr = e.toString();
+              
+              // Handle identification failures (Low confidence or Non-leaf) with a clear dialog
+              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
+                 showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        SizedBox(width: 10),
+                        Text('Identification Failed'),
+                      ],
+                    ),
+                    content: Text(errorStr.replaceFirst('Exception: ', '')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
               // US15: Offline Fallback - Save to PendingMedia
               try {
+                // ... (rest of offline logic remains same)
                 final media = PendingMedia(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   filePath: path,
@@ -405,6 +384,7 @@ class _MainAppState extends State<MainApp> {
         );
       case 'upload':
         return UploadView(
+          isOnline: _isOnline,
           onBack: () => _navigateTo('home'),
           onUpload: (paths) async {
             if (paths.isEmpty) return;
@@ -468,7 +448,6 @@ class _MainAppState extends State<MainApp> {
                       child: CropAdviceCard(
                         result: firstResult!,
                         onClose: () => Navigator.pop(context),
-                        onChatbotTap: _toggleChatbot,
                       ),
                     ),
                   ),
@@ -481,6 +460,31 @@ class _MainAppState extends State<MainApp> {
             } catch (e) {
               if (!mounted) return;
               Navigator.pop(context); // Hide loading
+              
+              final errorStr = e.toString();
+              if (errorStr.contains('confidence') || errorStr.contains('identify a leaf')) {
+                 showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        SizedBox(width: 10),
+                        Text('Identification Failed'),
+                      ],
+                    ),
+                    content: Text(errorStr.replaceFirst('Exception: ', '')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Try Again'),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Error analyzing images: $e')),
               );
@@ -612,3 +616,5 @@ class _MainAppState extends State<MainApp> {
     );
   }
 }
+
+// Unit 64 by bhuvi-d
