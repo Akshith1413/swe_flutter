@@ -165,6 +165,20 @@ class CropService {
               "Apply fungicide spray every 7-10 days.",
               "Monitor plants regularly for new spots."
             ],
+      organicSteps: isHealthy
+          ? ["Use compost tea for preventative care."]
+          : [
+              "Spray neem oil every 5–7 days",
+              "Use baking soda solution (1 tsp per liter)",
+              "Improve soil drainage",
+            ],
+      chemicalSteps: isHealthy
+          ? ["No chemical treatment needed for healthy plants."]
+          : [
+              "Apply chlorothalonil fungicide",
+              "Use copper-based fungicide spray",
+              "Repeat treatment every 7–10 days"
+            ],
     );
 
     // Save to history

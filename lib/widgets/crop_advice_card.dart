@@ -28,6 +28,8 @@ class CropAdviceCard extends StatefulWidget {
 class _CropAdviceCardState extends State<CropAdviceCard> {
   bool _copied = false;
   List<String> _translatedSteps = [];
+  List<String> _translatedOrganicSteps = [];
+  List<String> _translatedChemicalSteps = [];
   String _targetLanguage = 'en-US';
   bool _isTranslating = false;
 
@@ -44,18 +46,26 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
     
     if (_targetLanguage.startsWith('en')) {
       _translatedSteps = List.from(widget.result.treatmentSteps);
+      _translatedOrganicSteps = List.from(widget.result.organicSteps);
+      _translatedChemicalSteps = List.from(widget.result.chemicalSteps);
     } else {
-      final List<String> translated = [];
-      for (final step in widget.result.treatmentSteps) {
-        final t = await TranslationService.translate(step, _targetLanguage);
-        translated.add(t);
-      }
-      _translatedSteps = translated;
+      _translatedSteps = await _translateList(widget.result.treatmentSteps);
+      _translatedOrganicSteps = await _translateList(widget.result.organicSteps);
+      _translatedChemicalSteps = await _translateList(widget.result.chemicalSteps);
     }
 
     if (mounted) {
       setState(() => _isTranslating = false);
     }
+  }
+
+  Future<List<String>> _translateList(List<String> list) async {
+    final List<String> translated = [];
+    for (final item in list) {
+      final t = await TranslationService.translate(item, _targetLanguage);
+      translated.add(t);
+    }
+    return translated;
   }
 
   void _handleCopy() {
@@ -220,7 +230,19 @@ Analysis: ${widget.result.cause}
                       ),
                     ],
                   ),
-                  _buildTreatmentList(),
+                   _buildTreatmentList(),
+
+                  const SizedBox(height: 24),
+
+                  // Organic Treatment Section
+                  _buildSectionTitle(Icons.eco, 'Organic Treatment', const Color(0xFF10B981)),
+                  _buildStepsList(_translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps),
+
+                  const SizedBox(height: 24),
+
+                  // Chemical Treatment Section
+                  _buildSectionTitle(Icons.science, 'Chemical Treatment', Colors.orangeAccent),
+                  _buildStepsList(_translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps),
 
                   const SizedBox(height: 32),
 
@@ -369,6 +391,14 @@ Analysis: ${widget.result.cause}
     
     if (steps.isEmpty) {
       return _buildGlassInfoCard('No specific treatment steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+    }
+
+    return _buildStepsList(steps);
+  }
+
+  Widget _buildStepsList(List<String> steps) {
+    if (steps.isEmpty) {
+      return _buildGlassInfoCard('No steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
     }
 
     return Column(

@@ -46,6 +46,12 @@ class AnalysisResult {
   /// Step-by-step treatment instructions.
   final List<String> treatmentSteps;
 
+  /// Organic treatment steps.
+  final List<String> organicSteps;
+
+  /// Chemical treatment steps.
+  final List<String> chemicalSteps;
+
   /// Creates an [AnalysisResult] instance.
   AnalysisResult({
     required this.id,
@@ -62,6 +68,8 @@ class AnalysisResult {
     required this.organic,
     required this.prevention,
     required this.treatmentSteps,
+    required this.organicSteps,
+    required this.chemicalSteps,
   });
 
   /// Converts the [AnalysisResult] instance to a JSON map.
@@ -81,6 +89,8 @@ class AnalysisResult {
       'organic': organic,
       'prevention': prevention,
       'treatmentSteps': treatmentSteps,
+      'organicSteps': organicSteps,
+      'chemicalSteps': chemicalSteps,
     };
   }
 
@@ -103,6 +113,12 @@ class AnalysisResult {
       treatmentSteps: json['treatmentSteps'] != null 
           ? List<String>.from(json['treatmentSteps']) 
           : [],
+      organicSteps: json['organicSteps'] != null
+          ? List<String>.from(json['organicSteps'])
+          : [],
+      chemicalSteps: json['chemicalSteps'] != null
+          ? List<String>.from(json['chemicalSteps'])
+          : [],
     );
   }
 
@@ -122,6 +138,8 @@ class AnalysisResult {
     String? organic,
     String? prevention,
     List<String>? treatmentSteps,
+    List<String>? organicSteps,
+    List<String>? chemicalSteps,
   }) {
     return AnalysisResult(
       id: id ?? this.id,
@@ -138,6 +156,8 @@ class AnalysisResult {
       organic: organic ?? this.organic,
       prevention: prevention ?? this.prevention,
       treatmentSteps: treatmentSteps ?? this.treatmentSteps,
+      organicSteps: organicSteps ?? this.organicSteps,
+      chemicalSteps: chemicalSteps ?? this.chemicalSteps,
     );
   }
 }
