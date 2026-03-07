@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../core/providers/language_provider.dart';
+import '../services/preferences_service.dart';
+import '../services/location_service.dart';
+import '../services/region_service.dart';
 
 /// Settings View - App settings
 /// Matches React's SettingsPanel component with localization
@@ -25,6 +28,83 @@ class _SettingsViewState extends State<SettingsView> {
   bool _pestAlerts = true;
   bool _soundEnabled = true;
   bool _darkMode = false;
+  String _selectedRegion = 'Tamil Nadu';
+  final List<String> _regions = ['Tamil Nadu', 'Punjab', 'Maharashtra'];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final region = await preferencesService.getRegion() ?? 'Tamil Nadu';
+    if (mounted) {
+      setState(() => _selectedRegion = region);
+    }
+  }
+
+  Future<void> _onRegionTap() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Region'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ..._regions.map((r) => ListTile(
+              title: Text(r),
+              onTap: () => Navigator.pop(context, r),
+            )),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.my_location, color: AppColors.nature600),
+              title: const Text('Auto-detect Location', style: TextStyle(color: AppColors.nature600, fontWeight: FontWeight.bold)),
+              onTap: () => Navigator.pop(context, 'auto'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == 'auto') {
+      _autoDetectRegion();
+    } else if (result != null && mounted) {
+      setState(() => _selectedRegion = result);
+      await preferencesService.setRegion(result);
+    }
+  }
+
+  Future<void> _autoDetectRegion() async {
+    try {
+      // Show loading indicator
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Detecting your location...'), duration: Duration(seconds: 2)),
+      );
+
+      final position = await LocationService.getCurrentPosition();
+      final region = RegionService.getRegionFromCoordinates(position.latitude, position.longitude);
+
+      if (region != null && mounted) {
+        setState(() => _selectedRegion = region);
+        await preferencesService.setRegion(region);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Detected Region: $region')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not determine region for your location. Please select manually.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location error: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +158,23 @@ class _SettingsViewState extends State<SettingsView> {
                     ],
                   ),
                   onTap: widget.onLanguageChange,
+                ),
+                _buildDivider(),
+                _buildSettingsItem(
+                  icon: Icons.location_on,
+                  title: 'Region',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _selectedRegion,
+                        style: TextStyle(color: AppColors.gray500),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.chevron_right, color: AppColors.gray400),
+                    ],
+                  ),
+                  onTap: _onRegionTap,
                 ),
                 _buildDivider(),
                 _buildSwitchItem(

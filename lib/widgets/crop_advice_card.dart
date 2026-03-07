@@ -1,26 +1,27 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../models/analysis_result.dart';
-import '../screens/chatbot_view.dart';
+import '../services/preferences_service.dart';
+import '../services/tts_service.dart';
+import '../services/translation_service.dart';
+import '../services/region_service.dart';
+import '../services/preferences_service.dart';
+import '../services/treatment_service.dart';
 
-/// A card widget that displays detailed AI-generated crop advice.
-/// 
-/// Shows:
-/// - Crop and detected disease information.
-/// - Confidence and severity levels.
-/// - Detailed sections for cause, symptoms, immediate action, solutions, and prevention.
-/// - Copy-to-clipboard functionality.
+/// A sophisticated advice card matching the React application's high-end UI.
+/// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
 class CropAdviceCard extends StatefulWidget {
   final AnalysisResult result;
   final VoidCallback onClose;
-  final VoidCallback? onChatbotTap;
 
   const CropAdviceCard({
     super.key,
     required this.result,
     required this.onClose,
-    this.onChatbotTap,
   });
 
   @override
@@ -29,23 +30,72 @@ class CropAdviceCard extends StatefulWidget {
 
 class _CropAdviceCardState extends State<CropAdviceCard> {
   bool _copied = false;
+  List<String> _translatedSteps = [];
+  List<String> _translatedOrganicSteps = [];
+  List<String> _translatedChemicalSteps = [];
+  String _targetLanguage = 'en-US';
+  bool _isTranslating = false;
+  String? _regionAdvice;
+  String? _translatedRegionAdvice;
+  Map<String, dynamic>? _structuredTreatments;
 
-  /// Copies the advice details to the system clipboard.
+  @override
+  void initState() {
+    super.initState();
+    _initializeTranslations();
+  }
+
+  Future<void> _initializeTranslations() async {
+    setState(() => _isTranslating = true);
+    
+    _targetLanguage = await preferencesService.getLanguage() ?? 'en-US';
+    
+    if (_targetLanguage.startsWith('en')) {
+      _translatedSteps = List.from(widget.result.treatmentSteps);
+      _translatedOrganicSteps = List.from(widget.result.organicSteps);
+      _translatedChemicalSteps = List.from(widget.result.chemicalSteps);
+    } else {
+      _translatedSteps = await _translateList(widget.result.treatmentSteps);
+      _translatedOrganicSteps = await _translateList(widget.result.organicSteps);
+      _translatedChemicalSteps = await _translateList(widget.result.chemicalSteps);
+    }
+
+    // Fetch Current Region for localized advice and dosage
+    final region = await preferencesService.getRegion() ?? 'Tamil Nadu';
+    _regionAdvice = await RegionService.getRegionAdvice(region, widget.result.disease);
+    
+    if (_regionAdvice != null && !_targetLanguage.startsWith('en')) {
+      _translatedRegionAdvice = await TranslationService.translate(_regionAdvice!, _targetLanguage);
+    }
+
+    // Fetch Structured Dosage Treatments
+    _structuredTreatments = await TreatmentService.getTreatment(
+      widget.result.disease,
+      region: region,
+    );
+
+    if (mounted) {
+      setState(() => _isTranslating = false);
+    }
+  }
+
+  Future<List<String>> _translateList(List<String> list) async {
+    final List<String> translated = [];
+    for (final item in list) {
+      final t = await TranslationService.translate(item, _targetLanguage);
+      translated.add(t);
+    }
+    return translated;
+  }
+
   void _handleCopy() {
     final text = '''
 Crop: ${widget.result.crop}
 Disease: ${widget.result.disease}
 Severity: ${widget.result.severity}
 Confidence: ${(widget.result.confidence * 100).toStringAsFixed(0)}%
-
-CAUSE: ${widget.result.cause}
-SYMPTOMS: ${widget.result.symptoms}
-IMMEDIATE TREATMENT: ${widget.result.immediate}
-CHEMICAL SOLUTION: ${widget.result.chemical}
-ORGANIC SOLUTION: ${widget.result.organic}
-PREVENTION: ${widget.result.prevention}
+Analysis: ${widget.result.cause}
 ''';
-
     Clipboard.setData(ClipboardData(text: text));
     setState(() => _copied = true);
     Future.delayed(const Duration(seconds: 2), () {
@@ -53,185 +103,59 @@ PREVENTION: ${widget.result.prevention}
     });
   }
 
-  Color _getSeverityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-      case 'severe':
-        return AppColors.red600;
-      case 'moderate':
-      case 'medium':
-        return AppColors.amber600;
-      default:
-        return AppColors.nature600;
-    }
-  }
-
-  Color _getSeverityBgColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'high':
-      case 'severe':
-        return AppColors.red50;
-      case 'moderate':
-      case 'medium':
-        return AppColors.amber50;
-      default:
-        return AppColors.nature50;
-    }
-  }
-
-  void _openChatbot() {
-    final onChatbotTap = widget.onChatbotTap;
-    if (onChatbotTap != null) {
-      Navigator.pop(context);
-      Future.delayed(const Duration(milliseconds: 350), () {
-        onChatbotTap();
-      });
-    } else {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => ChatbotView(
-          onClose: () => Navigator.pop(ctx),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF10B981), Color(0xFF16A34A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A), // React-matching dark background
+      body: CustomScrollView(
+        slivers: [
+          // 1. Large Image Header with Gradient
+          SliverAppBar(
+            expandedHeight: 300,
+            pinned: true,
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF0F172A),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Icon(Icons.eco, color: Colors.white, size: 32),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.result.crop,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'AI-Generated Advice',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        onPressed: widget.onClose,
-                        icon: const Icon(Icons.close, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Disease Info Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
+                  _buildImage(),
+                  const DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Color(0xFF0F172A),
+                        ],
+                        stops: [0.6, 1.0],
+                      ),
                     ),
+                  ),
+                  Positioned(
+                    bottom: 24,
+                    left: 20,
+                    right: 20,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.warning_amber_rounded, color: Colors.white),
-                                const SizedBox(width: 8),
-                                Text(
-                                  widget.result.disease,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            InkWell(
-                              onTap: _handleCopy,
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _copied ? Icons.check : Icons.copy,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _copied ? 'Copied!' : 'Copy',
-                                      style: const TextStyle(color: Colors.white),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          widget.result.crop,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _buildBadge(
-                              widget.result.severity,
-                              _getSeverityBgColor(widget.result.severity),
-                              _getSeverityColor(widget.result.severity),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildBadge(
-                              '${(widget.result.confidence * 100).toStringAsFixed(0)}% Confidence',
-                              Colors.white.withOpacity(0.2),
-                              Colors.white,
-                            ),
-                          ],
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.result.disease,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -239,125 +163,152 @@ PREVENTION: ${widget.result.prevention}
                 ],
               ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: widget.onClose,
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black26,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
 
-          // Content
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                _AdviceSection(
-                  icon: Icons.info_outline,
-                  title: 'Cause',
-                  content: widget.result.cause,
-                  bgColor: AppColors.blue50,
-                  borderColor: AppColors.blue200,
-                  iconColor: AppColors.blue600,
-                ),
-                _AdviceSection(
-                  icon: Icons.track_changes,
-                  title: 'Symptoms to Look For',
-                  content: widget.result.symptoms,
-                  bgColor: AppColors.purple50,
-                  borderColor: AppColors.purple200,
-                  iconColor: AppColors.purple600,
-                ),
-                _AdviceSection(
-                  icon: Icons.warning_amber_rounded,
-                  title: 'Immediate Action',
-                  content: widget.result.immediate,
-                  bgColor: AppColors.red50,
-                  borderColor: AppColors.red200,
-                  iconColor: AppColors.red600,
-                  highlight: true,
-                ),
-                _AdviceSection(
-                  icon: Icons.sanitizer,
-                  title: 'Chemical Solution',
-                  content: widget.result.chemical,
-                  bgColor: AppColors.amber50,
-                  borderColor: AppColors.amber200,
-                  iconColor: AppColors.amber600,
-                ),
-                _AdviceSection(
-                  icon: Icons.water_drop,
-                  title: 'Organic/Natural Remedy',
-                  content: widget.result.organic,
-                  bgColor: AppColors.nature50,
-                  borderColor: AppColors.nature200,
-                  iconColor: AppColors.nature600,
-                ),
-                _AdviceSection(
-                  icon: Icons.security,
-                  title: 'Prevention Tips',
-                  content: widget.result.prevention,
-                  bgColor: const Color(0xFFF0FDFA), // teal-50
-                  borderColor: const Color(0xFF99F6E4), // teal-200
-                  iconColor: const Color(0xFF0D9488), // teal-600
-                ),
-                
-                // Disclaimer
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.amber50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.amber200),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          // 2. Main Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Confidence & Severity Row
+                  Row(
                     children: [
-                      const Icon(Icons.info, color: AppColors.amber600, size: 20),
+                      Expanded(
+                        child: _buildMetricCard(
+                          'Confidence',
+                          '${(widget.result.confidence * 100).toInt()}%',
+                          Icons.radar,
+                          color: const Color(0xFF10B981),
+                          progress: widget.result.confidence,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          'Important: This advice is AI-generated and should be used as a guide. For severe cases, please consult with a local agricultural expert.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.amber800,
-                            height: 1.5,
-                          ),
+                        child: _buildMetricCard(
+                          'Severity',
+                          widget.result.severity,
+                          Icons.error_outline,
+                          color: _getSeverityColor(widget.result.severity),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-          // Chatbot section - fixed at bottom, always visible
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  "Need more help from experts?",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+
+                  const SizedBox(height: 24),
+
+                  // AI Insight Section (Quick Tip)
+                  _buildSectionTitle(LucideIcons.sparkles, 'AI Insight', Colors.purpleAccent),
+                  _buildGlassInfoCard(
+                    widget.result.cause,
+                    icon: Icons.lightbulb_outline,
+                    iconColor: Colors.amberAccent,
                   ),
-                ),
-                const SizedBox(height: 15),
-                ElevatedButton.icon(
-                  onPressed: _openChatbot,
-                  icon: const Icon(Icons.chat),
-                  label: const Text("Ask Farming Expert Chatbot"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+
+                  const SizedBox(height: 24),
+
+                  // Symptoms Section
+                  _buildSectionTitle(LucideIcons.list, 'Detected Symptoms', Colors.blueAccent),
+                  _buildSymptomsTags(),
+
+                  const SizedBox(height: 24),
+
+                  // Treatment Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSectionTitle(LucideIcons.checkCircle, 'Recommended Actions', const Color(0xFF10B981)),
+                      TextButton.icon(
+                        onPressed: _isTranslating ? null : () {
+                          TTSService.speakSteps(_translatedSteps, _targetLanguage);
+                        },
+                        icon: Icon(
+                          _isTranslating ? Icons.hourglass_empty : Icons.volume_up, 
+                          size: 20, 
+                          color: const Color(0xFF10B981)
+                        ),
+                        label: Text(
+                          _isTranslating ? 'Translating...' : 'Play Instructions',
+                          style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                   _buildTreatmentList(),
+
+                  const SizedBox(height: 24),
+
+                  // Organic Treatment Section
+                  _buildSectionTitle(Icons.eco, 'Organic Treatment', const Color(0xFF10B981)),
+                  _buildStepsList(
+                    _translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps,
+                    type: 'organic',
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Chemical Treatment Section
+                  _buildSectionTitle(Icons.science, 'Chemical Treatment', Colors.orangeAccent),
+                  _buildStepsList(
+                    _translatedChemicalSteps.isEmpty ? widget.result.chemicalSteps : _translatedChemicalSteps,
+                    type: 'chemical',
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Regional Advice Section
+                  if (_regionAdvice != null) ...[
+                    _buildSectionTitle(Icons.map_outlined, 'Regional Advice', Colors.cyanAccent),
+                    GestureDetector(
+                      onTap: () {
+                        TTSService.speakText(_translatedRegionAdvice ?? _regionAdvice!, _targetLanguage);
+                      },
+                      child: _buildGlassInfoCard(
+                        _translatedRegionAdvice ?? _regionAdvice!,
+                        icon: Icons.info_outline,
+                        iconColor: Colors.cyanAccent,
+                      ),
                     ),
-                    textStyle: const TextStyle(fontSize: 16),
+                    const SizedBox(height: 32),
+                  ],
+
+                  // Bottom Action
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _handleCopy,
+                      icon: Icon(_copied ? Icons.check : Icons.copy, size: 18),
+                      label: Text(_copied ? 'Copied to Clipboard' : 'Share Report'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.1),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 48),
+                ],
+              ),
             ),
           ),
         ],
@@ -365,111 +316,282 @@ PREVENTION: ${widget.result.prevention}
     );
   }
 
-  Widget _buildBadge(String text, Color bgColor, Color textColor) {
+  Widget _buildImage() {
+    if (kIsWeb) {
+      if (widget.result.imageUrl.startsWith('blob:') || widget.result.imageUrl.startsWith('data:')) {
+        return Image.network(widget.result.imageUrl, fit: BoxFit.cover);
+      }
+    }
+    
+    final file = File(widget.result.imageUrl);
+    if (!kIsWeb && file.existsSync()) {
+      return Image.file(file, fit: BoxFit.cover);
+    }
+    
+    // Fallback if image not found (local history item with expired temp path)
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
+      color: Colors.grey[900],
+      child: const Center(
+        child: Icon(Icons.eco, size: 80, color: Colors.white10),
       ),
     );
   }
-}
 
-/// Helper widget to display a section of advice.
-class _AdviceSection extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String content;
-  final Color bgColor;
-  final Color borderColor;
-  final Color iconColor;
-  final bool highlight;
-
-  const _AdviceSection({
-    required this.icon,
-    required this.title,
-    required this.content,
-    required this.bgColor,
-    required this.borderColor,
-    required this.iconColor,
-    this.highlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildMetricCard(String title, String value, IconData icon, {required Color color, double? progress}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: highlight ? AppColors.red300 : borderColor,
-          width: highlight ? 2 : 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.gray800,
-                      ),
-                    ),
-                    if (highlight) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.red500,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'URGENT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.gray700,
-                    height: 1.5,
+          Row(
+            children: [
+              Icon(icon, size: 14, color: Colors.white54),
+              const SizedBox(width: 6),
+              Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                value,
+                style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              if (progress != null)
+                SizedBox(
+                  width: 32, height: 32,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 3,
+                    backgroundColor: Colors.white10,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildSectionTitle(IconData icon, String title, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassInfoCard(String content, {required IconData icon, required Color iconColor}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: iconColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: iconColor.withOpacity(0.1)),
+      ),
+      child: Text(
+        content,
+        style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+      ),
+    );
+  }
+
+  Widget _buildSymptomsTags() {
+    final symptoms = widget.result.symptoms.split(',');
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: symptoms.map((s) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Text(s.trim(), style: const TextStyle(color: Colors.white54, fontSize: 13)),
+      )).toList(),
+    );
+  }
+
+  Widget _buildTreatmentList() {
+    final steps = _translatedSteps.isEmpty ? widget.result.treatmentSteps : _translatedSteps;
+    
+    if (steps.isEmpty) {
+      return _buildGlassInfoCard('No specific treatment steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+    }
+
+    return _buildStepsList(steps);
+  }
+
+  Widget _buildStepsList(List<String> steps, {String type = 'organic'}) {
+    final structuredList = _structuredTreatments != null ? _structuredTreatments![type] as List? : null;
+
+    if (steps.isEmpty && (structuredList == null || structuredList.isEmpty)) {
+      return _buildGlassInfoCard('No steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+    }
+
+    return Column(
+      children: [
+        if (structuredList != null && structuredList.isNotEmpty)
+          ...structuredList.map((item) {
+            final name = item['name'] as String;
+            final dosage = item['dosage'] as String;
+            final frequency = item['frequency'] as String;
+            
+            return _buildDosageCard(name, dosage, frequency);
+          }).toList(),
+        
+        ...List.generate(steps.length, (index) {
+          final stepNumber = index + 1;
+          final stepText = steps[index];
+
+          return GestureDetector(
+            onTap: () {
+              TTSService.speakText(stepText, _targetLanguage);
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade900,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: const Color(0xFF10B981),
+                    child: Text(
+                      "$stepNumber",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      stepText,
+                      style: TextStyle(
+                        color: _isTranslating ? Colors.white38 : Colors.white,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.volume_up, size: 18, color: Colors.white24),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDosageCard(String name, String dosage, String frequency) {
+    final speechText = "Apply $name. Dosage $dosage. Repeat $frequency.";
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () => TTSService.speakText(speechText, _targetLanguage),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.medication, color: Colors.greenAccent, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.volume_up, color: Colors.white.withOpacity(0.5), size: 18),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildDosageInfoRow(Icons.science_outlined, "Dosage: ", dosage),
+              const SizedBox(height: 4),
+              _buildDosageInfoRow(Icons.event_repeat, "Frequency: ", frequency),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDosageInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.greenAccent.withOpacity(0.7), size: 14),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'severe':
+      case 'high':
+        return Colors.redAccent;
+      case 'moderate':
+      case 'medium':
+        return Colors.amberAccent;
+      case 'low':
+      case 'healthy':
+        return Colors.greenAccent;
+      default:
+        return Colors.blueAccent;
+    }
   }
 }

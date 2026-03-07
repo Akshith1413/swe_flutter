@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
+import '../services/offline_storage_service.dart';
+import '../services/preferences_service.dart';
+import '../services/location_service.dart';
+import '../services/region_service.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -29,11 +33,14 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   bool _isGuest = false;
+  int _pendingSyncCount = 0; // US15: Pending offline sync count
 
   @override
   void initState() {
     super.initState();
     _checkGuestMode();
+    _loadPendingSyncCount();
+    _checkRegionSetup();
   }
 
   /// Checks if the user is in guest mode to display the banner.
@@ -43,6 +50,110 @@ class _HomeViewState extends State<HomeView> {
       setState(() {
         _isGuest = isGuest;
       });
+    }
+  }
+
+  /// US15: Loads the count of pending offline media items.
+  Future<void> _loadPendingSyncCount() async {
+    final count = await offlineStorageService.getPendingCount();
+    if (mounted) {
+      setState(() => _pendingSyncCount = count);
+    }
+  }
+
+  /// US27: Checks if region is set, if not, prompts user.
+  Future<void> _checkRegionSetup() async {
+    final region = await preferencesService.getRegion();
+    if (region == null) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          _showRegionSetupDialog();
+        }
+      });
+    }
+  }
+
+  Future<void> _showRegionSetupDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Localize Your Advice'),
+        content: const Text(
+          'To provide treatment advice specific to your regional climate, we need to know your state. Would you like to auto-detect your location or select manually?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showManualRegionSelection();
+            },
+            child: const Text('Select Manually'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _autoDetectRegion();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.nature600),
+            child: const Text('Auto-detect', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showManualRegionSelection() async {
+    final List<String> regions = ['Tamil Nadu', 'Punjab', 'Maharashtra'];
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select State'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: regions.map((r) => ListTile(
+            title: Text(r),
+            onTap: () => Navigator.pop(context, r),
+          )).toList(),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await preferencesService.setRegion(result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Region set to $result')),
+      );
+    }
+  }
+
+  Future<void> _autoDetectRegion() async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Detecting your location...'), duration: Duration(seconds: 2)),
+      );
+
+      final position = await LocationService.getCurrentPosition();
+      final region = RegionService.getRegionFromCoordinates(position.latitude, position.longitude);
+
+      if (region != null && mounted) {
+        await preferencesService.setRegion(region);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Detected Region: $region')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not determine region. Please select manually.')),
+        );
+        _showManualRegionSelection();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location error: $e')),
+        );
+        _showManualRegionSelection();
+      }
     }
   }
 
@@ -170,53 +281,61 @@ class _HomeViewState extends State<HomeView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            // App Icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+        Expanded(
+          child: Row(
+            children: [
+              // App Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.eco,
+                  size: 28,
+                  color: Colors.white,
+                ),
               ),
-              child: const Icon(
-                Icons.eco,
-                size: 28,
-                color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${context.t(_getGreetingKey())},',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.gray500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      context.t('homeView.userTitle'),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: AppColors.gray800,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${context.t(_getGreetingKey())},',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.gray500,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  context.t('homeView.userTitle'),
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.gray800,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
         Row(
           children: [
@@ -614,7 +733,7 @@ class _HomeViewState extends State<HomeView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '24°C',
+                    '24Â°C',
                     style: TextStyle(
                       color: AppColors.gray800,
                       fontSize: 32,
@@ -719,6 +838,15 @@ class _HomeViewState extends State<HomeView> {
           widget.isOnline ? context.t('homeView.status.online') : context.t('homeView.status.offline'),
         ),
         const SizedBox(width: 24),
+        // US15: Offline sync indicator
+        if (_pendingSyncCount > 0)
+          _buildStatusItem(
+            AppColors.amber600,
+            '$_pendingSyncCount pending',
+            icon: Icons.cloud_upload,
+          ),
+        if (_pendingSyncCount > 0)
+          const SizedBox(width: 24),
         _buildStatusItem(
           AppColors.gray500,
           context.t('homeView.status.mobile'),
