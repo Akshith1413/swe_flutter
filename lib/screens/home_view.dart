@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/consent_service.dart';
@@ -7,6 +7,8 @@ import '../services/preferences_service.dart';
 import '../services/location_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../services/region_service.dart';
+import '../services/alert_manager.dart';
+import '../models/alert_models.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -42,6 +44,19 @@ class _HomeViewState extends State<HomeView> {
     _checkGuestMode();
     _loadPendingSyncCount();
     _checkRegionSetup();
+
+    // Show welcome alert
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          AlertManager.showInfo(
+            context,
+            'Welcome to CropAId! Tap Scan to start diagnosing your plants.',
+            urgency: UrgencyLevel.low,
+          );
+        }
+      });
+    });
   }
 
   /// Checks if the user is in guest mode to display the banner.
@@ -741,7 +756,7 @@ class _HomeViewState extends State<HomeView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '24Â°C',
+                    '24°C',
                     style: TextStyle(
                       color: AppColors.gray800,
                       fontSize: 32,
