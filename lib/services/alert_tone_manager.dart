@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/alert_models.dart';
 
@@ -31,8 +32,8 @@ class AlertToneManager {
 
       await _audioPlayer.play(AssetSource(soundPath));
     } catch (e) {
-      // Handle audio playback errors gracefully
-      print('Failed to play alert tone: $e');
+      // Handle audio playback errors gracefully (e.g. missing assets on web)
+      debugPrint('AlertToneManager: Could not play $urgency tone. This is expected if assets are missing. Error: $e');
     }
   }
 

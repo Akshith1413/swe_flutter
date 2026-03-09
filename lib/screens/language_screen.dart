@@ -276,7 +276,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
         onTap: () => widget.onSelect(lang.code),
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -288,30 +288,33 @@ class _LanguageScreenState extends State<LanguageScreen> {
               ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                lang.nativeName,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryGreen,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              if (lang.code != 'en') ...[
-                const SizedBox(height: 4),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 Text(
-                  lang.name,
+                  lang.nativeName,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primaryGreen.withOpacity(0.7),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryGreen,
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (lang.code != 'en') ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    lang.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primaryGreen.withOpacity(0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
