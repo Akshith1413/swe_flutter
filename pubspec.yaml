@@ -56,8 +56,6 @@ dependencies:
   intl: ^0.20.2
 
   # Utilities
-  cached_network_image: ^3.4.1
-  image: ^4.2.0
   # Geolocator
   geolocator: ^13.0.1
 
