@@ -1,59 +1,63 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-import '../core/utils/responsive_layout.dart';
+import '../core/theme/app_colors.dart';
 import '../services/preferences_service.dart';
-import '../services/database_service.dart';
+import '../services/offline_storage_service.dart';
 import '../models/analysis_result.dart';
+import '../models/pending_media.dart';
 import '../widgets/crop_advice_card.dart';
-import '../widgets/media_gallery.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 
-/// History View — Premium dark theme with responsive grid/list.
-///
-/// Shows past diagnosis history and pending uploads in tabs.
+/// A unified history view that combines analyzed results and pending media.
+/// Provides a sleek, chronological feed of all farmer activity.
 class HistoryView extends StatefulWidget {
   final VoidCallback onBack;
 
-  const HistoryView({super.key, required this.onBack});
+  const HistoryView({
+    super.key,
+    required this.onBack,
+  });
 
   @override
   State<HistoryView> createState() => _HistoryViewState();
 }
 
-class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  List<AnalysisResult> _history = [];
+class _HistoryViewState extends State<HistoryView> {
+  List<dynamic> _unifiedHistory = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadHistory();
+    _loadAllHistory();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadHistory() async {
+  Future<void> _loadAllHistory() async {
+    setState(() => _isLoading = true);
     try {
-      if (kIsWeb) {
-        // Fallback or empty for Web
-        _history = [];
-      } else {
-        _history = await databaseService.getAllDiagnoses();
-      }
-      
+      // 1. Load Analyzed History
+      final historyData = await preferencesService.getAnalysisHistory();
+      final analyzedResults = historyData.map((json) => AnalysisResult.fromJson(json)).toList();
+
+      // 2. Load Pending Media
+      final pendingMedia = await offlineStorageService.getAllPendingMedia();
+
+      // 3. Combine and Sort by Date (Reverse Chronological)
+      final combined = [...analyzedResults, ...pendingMedia];
+      combined.sort((a, b) {
+        final dateA = a is AnalysisResult ? a.date : DateTime.fromMillisecondsSinceEpoch((a as PendingMedia).createdAt);
+        final dateB = b is AnalysisResult ? b.date : DateTime.fromMillisecondsSinceEpoch((b as PendingMedia).createdAt);
+        return dateB.compareTo(dateA);
+      });
+
       if (mounted) {
         setState(() {
+          _unifiedHistory = combined;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading history: $e');
+      debugPrint('Error loading unified history: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -63,25 +67,9 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-          child: CropAdviceCard(
-            result: result,
-            onClose: () => Navigator.pop(context),
-          ),
-        ),
+      builder: (context) => CropAdviceCard(
+        result: result,
+        onClose: () => Navigator.pop(context),
       ),
     );
   }
@@ -89,89 +77,179 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F1A2E),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, color: AppColors.gray800),
           onPressed: widget.onBack,
-          color: Colors.white70,
         ),
         title: const Text(
-          'History & Uploads',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          'Your Activity History',
+          style: TextStyle(color: AppColors.gray800, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.refreshCcw, size: 20),
-            onPressed: () {
-              setState(() => _isLoading = true);
-              _loadHistory();
-            },
-            color: Colors.white54,
+            icon: const Icon(LucideIcons.refreshCw, size: 20, color: AppColors.gray600),
+            onPressed: _loadAllHistory,
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF10B981),
-          unselectedLabelColor: Colors.white38,
-          indicatorColor: const Color(0xFF10B981),
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          tabs: const [
-            Tab(text: 'Analysis History'),
-            Tab(text: 'Pending Uploads'),
-          ],
-        ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
-          ),
-        ),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
-                : _history.isEmpty
+      body: Column(
+        children: [
+          _buildSummaryStats(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.nature600))
+                : _unifiedHistory.isEmpty
                     ? _buildEmptyState()
-                    : _buildHistoryList(context),
-            const MediaGallery(),
+                    : _buildHistoryList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStats() {
+    final analysisCount = _unifiedHistory.whereType<AnalysisResult>().length;
+    final mediaCount = _unifiedHistory.whereType<PendingMedia>().length;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      color: Colors.white,
+      child: Row(
+        children: [
+          _buildStatItem('Analyzed', analysisCount.toString(), LucideIcons.leaf, const Color(0xFF10B981)),
+          const SizedBox(width: 12),
+          _buildStatItem('Media', mediaCount.toString(), LucideIcons.camera, Colors.blue),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+                Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHistoryList(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isWide = width >= Breakpoints.mobile;
-
-    if (isWide) {
-      // Grid for tablet/desktop
-      return GridView.builder(
-        padding: responsivePadding(context),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: width >= Breakpoints.tablet ? 3 : 2,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          childAspectRatio: 1.5,
-        ),
-        itemCount: _history.length,
-        itemBuilder: (context, index) => _buildHistoryCard(context, _history[index]),
-      );
-    }
-
+  Widget _buildHistoryList() {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _history.length,
-      itemBuilder: (context, index) => _buildHistoryCard(context, _history[index]),
+      padding: const EdgeInsets.all(20),
+      itemCount: _unifiedHistory.length,
+      itemBuilder: (context, index) {
+        final item = _unifiedHistory[index];
+        if (item is AnalysisResult) {
+          return _buildAnalysisCard(item);
+        } else {
+          return _buildMediaCard(item as PendingMedia);
+        }
+      },
+    );
+  }
+
+  Widget _buildAnalysisCard(AnalysisResult item) {
+    final isHealthy = item.disease.toLowerCase() == 'healthy';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: InkWell(
+        onTap: () => _showAdvice(item),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(color: isHealthy ? const Color(0xFF10B981).withOpacity(0.1) : Colors.amber[50], borderRadius: BorderRadius.circular(16)),
+                child: Icon(LucideIcons.leaf, color: isHealthy ? const Color(0xFF10B981) : Colors.amber, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.crop, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(item.disease, style: TextStyle(color: isHealthy ? const Color(0xFF10B981) : Colors.amber[800], fontSize: 13, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 6),
+                    Text(DateFormat.yMMMd().format(item.date), style: const TextStyle(color: Colors.black38, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const Icon(LucideIcons.chevronRight, size: 18, color: Colors.black12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaCard(PendingMedia item) {
+    final isVideo = item.fileType == 'video';
+    final date = DateTime.fromMillisecondsSinceEpoch(item.createdAt);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blue.withOpacity(0.1)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 60, height: 60,
+              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(16)),
+              child: Icon(isVideo ? LucideIcons.video : LucideIcons.image, color: Colors.blue, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Captured Media', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(isVideo ? 'Video Recording' : 'Photo Capture', style: const TextStyle(color: Colors.blue, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Text(DateFormat.yMMMd().format(date), style: const TextStyle(color: Colors.black38, fontSize: 11)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.amber[50], borderRadius: BorderRadius.circular(8)),
+              child: const Text('Pending Analysis', style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -181,163 +259,22 @@ class _HistoryViewState extends State<HistoryView> with SingleTickerProviderStat
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFBBF24).withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(LucideIcons.history, size: 56, color: Color(0xFFFBBF24)),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20)]),
+            child: const Icon(LucideIcons.clipboardList, size: 64, color: AppColors.gray300),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'No History Yet',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('No Activity Yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.gray800)),
           const SizedBox(height: 8),
-          Text(
-            'Your plant diagnosis history will appear here',
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.5)),
+          const Text('Your analyzed crops will appear here.', style: TextStyle(color: AppColors.gray500, fontSize: 14)),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: widget.onBack,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.nature600, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: const Text('Start Diagnosis'),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildHistoryCard(BuildContext context, AnalysisResult item) {
-    final isHealthy = item.disease.toLowerCase() == 'healthy';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          onTap: () => _showAdvice(item),
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: isHealthy
-                        ? const Color(0xFF10B981).withOpacity(0.15)
-                        : const Color(0xFFFBBF24).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    LucideIcons.leaf,
-                    size: 26,
-                    color: isHealthy ? const Color(0xFF10B981) : const Color(0xFFFBBF24),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              item.crop,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          _buildSeverityBadge(item.severity),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.disease,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isHealthy ? const Color(0xFF10B981) : const Color(0xFFFBBF24),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDate(item.date),
-                            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.4)),
-                          ),
-                          Row(
-                            children: [
-                              Icon(LucideIcons.barChart, size: 13, color: const Color(0xFF38BDF8)),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${(item.confidence * 100).toInt()}%',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSeverityBadge(String severity) {
-    Color color;
-    switch (severity.toLowerCase()) {
-      case 'high':
-      case 'severe':
-        color = const Color(0xFFEF4444);
-        break;
-      case 'moderate':
-      case 'medium':
-        color = const Color(0xFFFBBF24);
-        break;
-      case 'low':
-        color = const Color(0xFF38BDF8);
-        break;
-      case 'healthy':
-      case 'none':
-        color = const Color(0xFF10B981);
-        break;
-      default:
-        color = Colors.white38;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        severity.isEmpty ? 'N/A' : severity,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final diff = now.difference(date);
-    if (diff.inDays == 0) return 'Today';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${date.day}/${date.month}/${date.year}';
   }
 }
