@@ -22,6 +22,7 @@ import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
 import 'smart_camera_guide_view.dart';
 import 'diagnosis_result_screen.dart';
+import 'simulator_view.dart';
 import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
@@ -489,6 +490,10 @@ class _MainAppState extends State<MainApp> {
         );
       case 'llm-advice':
         return LlmAdviceView(
+          onBack: () => _navigateTo('home'),
+        );
+      case 'simulator':
+        return SimulatorView(
           onBack: () => _navigateTo('home'),
         );
       default:

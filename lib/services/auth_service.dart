@@ -129,6 +129,12 @@ class AuthService {
     if (_useMock || _auth == null) return;
     await _auth!.signOut();
   }
+
+  /// Gets the current user's ID token.
+  Future<String?> getToken() async {
+    if (_useMock || _auth == null) return null;
+    return await _auth!.currentUser?.getIdToken();
+  }
 }
 
 /// Global singleton instance of [AuthService].

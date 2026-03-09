@@ -173,6 +173,10 @@ class AppColors {
   static const Color teal50 = Color(0xFFF0FDFA);
   static const Color teal600 = Color(0xFF0D9488);
 
+  static const Color indigo50 = Color(0xFFEEF2FF);
+  static const Color indigo100 = Color(0xFFE0E7FF);
+  static const Color indigo600 = Color(0xFF4F46E5);
+
   // Additional gray shades
   static const Color gray900 = Color(0xFF111827);
 
