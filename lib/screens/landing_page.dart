@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
-import '../core/constants/app_constants.dart';
 import '../core/localization/translation_service.dart';
 
 /// The entry screen of the application.
-/// 
-/// Shows the app branding and provides options to:
-/// - Continue as a guest (Guest Mode)
-/// - Create an Account / Login
-/// 
-/// Equivalent to React's `LandingPage.jsx`.
+/// Redesigned with premium AgriTech style.
 class LandingPage extends StatelessWidget {
   final VoidCallback onGuest;
   final VoidCallback onLogin;
@@ -23,138 +18,180 @@ class LandingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.primaryGreen,  // #0f5132
-              AppColors.secondaryGreen, // #2d6a4f
-            ],
+      body: Stack(
+        children: [
+          // Premium Branding Gradient
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1B5E20), // Forest
+                  Color(0xFF2E7D32), // Sage
+                  Color(0xFF81C784), // Light Leaf
+                ],
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          
+          // Subtle texture overlay (optional, but adds premium feel)
+          Opacity(
+            opacity: 0.1,
+            child: Container(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: NetworkImage('https://www.transparenttextures.com/patterns/natural-paper.png'),
+                  repeat: ImageRepeat.repeat,
+                ),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Hero Visual - Leaf Icon with Glassmorphism
+                  const Spacer(),
+                  
+                  // Hero Visual - Refined Icon
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(100),
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
-                        width: 1,
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 30,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.eco,
-                      size: 80,
+                      LucideIcons.leaf,
+                      size: 72,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 48),
 
-                  // Hero Text
+                  // branding Text
                   Text(
-                    context.t('landingPage.title'),
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    context.t('landingPage.title').toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     context.t('landingPage.subtitle'),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withOpacity(0.9),
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white.withOpacity(0.85),
+                      fontWeight: FontWeight.w500,
+                      height: 1.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  
+                  const Spacer(),
 
-                  // Buttons
-                  SizedBox(
-                    width: double.infinity,
-                    child: Column(
-                      children: [
-                        // Continue as Guest Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: onGuest,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppColors.primaryGreen,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              elevation: 4,
-                            ),
-                            icon: const Icon(Icons.eco, size: 20),
-                            label: Text(
-                              context.t('landingPage.continueAsGuest'),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+                  // Action Buttons
+                  Column(
+                    children: [
+                      // Continue as Guest Button (Primary Entry)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 64,
+                        child: ElevatedButton(
+                          onPressed: onGuest,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.primary,
+                            elevation: 8,
+                            shadowColor: Colors.black.withOpacity(0.3),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Create Account Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: onLogin,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(LucideIcons.leaf, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                context.t('landingPage.continueAsGuest'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                              side: BorderSide(
-                                color: Colors.white.withOpacity(0.4),
-                                width: 2,
-                              ),
-                            ),
-                            icon: const Icon(Icons.person, size: 20),
-                            label: Text(
-                              context.t('landingPage.createAccount'),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Login Button (Secondary)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 64,
+                        child: OutlinedButton(
+                          onPressed: onLogin,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                              color: Colors.white.withOpacity(0.4),
+                              width: 2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(LucideIcons.user, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                context.t('landingPage.createAccount'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 32),
+                  
+                  const SizedBox(height: 48),
 
-                  // Footer Text
+                  // Footer
                   Text(
                     context.t('landingPage.footer'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withOpacity(0.6),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.5),
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -162,7 +199,7 @@ class LandingPage extends StatelessWidget {
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

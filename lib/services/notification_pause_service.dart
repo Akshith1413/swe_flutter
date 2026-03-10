@@ -25,7 +25,7 @@ class NotificationPauseService {
   static Future<bool> isPaused() async {
     final prefs = await SharedPreferences.getInstance();
     
-    if (!prefs.getBool(_isPausedKey) ?? false) {
+    if (!(prefs.getBool(_isPausedKey) ?? false)) {
       return false;
     }
 

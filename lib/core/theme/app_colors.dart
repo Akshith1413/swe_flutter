@@ -1,195 +1,130 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// CropAId Color Palette
-/// Extracted from the React project's tailwind.config.js and App.css
+/// Professional AgriTech Color Palette for AI Crop Doctor
 class AppColors {
   AppColors._();
 
   // ============================================
-  // PREMIUM LIGHT PALETTE
+  // PRIMARY BRAND COLORS
   // ============================================
-  static const Color premiumMint = Color(0xFFF0FDF4); // bg-green-50
-  static const Color premiumBg = Color(0xFFF8FAF9);
-  static const Color premiumEmerald = Color(0xFF059669); // emerald-600
-  static const Color premiumTeal = Color(0xFF14B8A6); // teal-500
-  static const Color premiumSlate800 = Color(0xFF1E293B); // text-slate-800
-  static const Color premiumSlate500 = Color(0xFF64748B); // text-slate-500
-  static const Color premiumSlate100 = Color(0xFFF1F5F9); // bg-slate-100
-
-  // Premium Gradients
-  static const LinearGradient premiumGreenGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF059669), Color(0xFF10B981)],
-  );
-
-  static const LinearGradient premiumSkyGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF0EA5E9), Color(0xFF06B6D4)],
-  );
-
-  static const LinearGradient premiumSurfaceGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Colors.white, Color(0xFFF8FAFC)],
-  );
-
-  static const List<BoxShadow> premiumShadow = [
-    BoxShadow(
-      color: Color(0x0F000000),
-      blurRadius: 20,
-      offset: Offset(0, 8),
-    ),
-  ];
-
-  static const List<BoxShadow> premiumActiveShadow = [
-    BoxShadow(
-      color: Color(0x1F059669),
-      blurRadius: 24,
-      offset: Offset(0, 12),
-    ),
-  ];
+  static const Color primary = Color(0xFF2E7D32);      // Deep Green
+  static const Color primaryLight = Color(0xFF66BB6A); // Light Green
+  static const Color accent = Color(0xFFFFC107);       // Warning/Highlight Accent
+  static const Color background = Color(0xFFF4F7F6);   // Clean Background
+  static const Color surface = Colors.white;
 
   // ============================================
-  // PRIMARY GRADIENT COLORS (from CSS)
+  // NATURE & EARTH PALETTES
   // ============================================
-  static const Color primaryGreen = Color(0xFF0F5132);
-  static const Color secondaryGreen = Color(0xFF2D6A4F);
+  static const Color forest800 = Color(0xFF1B5E20);
+  static const Color forest600 = Color(0xFF2E7D32);
+  static const Color forest400 = Color(0xFF4CAF50);
+  static const Color forest100 = Color(0xFFE8F5E9);
+  static const Color forest50 = Color(0xFFF1F8E9); // Updated from F1F8F1
+  static const Color leaf100 = Color(0xFFE8F5E9);
+  static const Color nature600 = Color(0xFF16A34A); // Updated from 43A047
+  static const Color nature50 = Color(0xFFFDFBF7); // Subtle tan/organic white (Updated from FDFAF2)
+  
+  static const Color clay800 = Color(0xFF4E342E);
+  static const Color clay600 = Color(0xFF6D4C41);
+  static const Color tan100 = Color(0xFFF5F5F5);
+  static const Color tan50 = Color(0xFFF9F8F6); // Updated from FCFBF9
+  static const Color leaf50 = Color(0xFFF0FDF4);
+
+  // Missing color tokens used in various widgets
+  static const Color red500 = error;
+  static const Color red600 = Color(0xFFDC2626);
+  static const Color amber500 = warning;
+  static const Color amber600 = Color(0xFFD97706);
+  static const Color sky50 = Color(0xFFF0F9FF);
+  static const Color sky100 = Color(0xFFE0F2FE);
+  static const Color sky500 = Color(0xFF0EA5E9);
+  static const Color blue500 = Color(0xFF3B82F6);
+  static const Color teal600 = Color(0xFF0D9488);
+  static const Color nature100 = Color(0xFFDCFCE7);
+  static const Color nature200 = Color(0xFFBBF7D0);
+  static const Color nature500 = Color(0xFF22C55E);
+  static const Color nature800 = Color(0xFF166534);
+  static const Color nature900 = Color(0xFF14532D);
+  static const Color primaryGreen = primary;
+  static const Color secondaryGreen = Color(0xFF15803D);
   static const Color accentGreen = Color(0xFF4ADE80);
-  static const Color emeraldGreen = Color(0xFF22C55E);
-  static const Color greenLight = Color(0xFF16A34A);
-
-  // Primary Gradient
-  static const LinearGradient primaryGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [primaryGreen, secondaryGreen],
-  );
-
-  // Hero Gradient (for buttons)
-  static const LinearGradient heroGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [accentGreen, emeraldGreen],
-  );
+  static const Color gray50 = Color(0xFFF9FAFB);
+  static const Color gray300 = Color(0xFFD1D5DB);
+  static const Color gray900 = Color(0xFF111827);
+  static const Color earth500 = Color(0xFF78350F);
+  static const Color verified = success;
 
   // ============================================
-  // NATURE PALETTE (from tailwind.config.js)
+  // STATUS COLORS
   // ============================================
-  static const Color nature50 = Color(0xFFF2FCF5);
-  static const Color nature100 = Color(0xFFE1F8E8);
-  static const Color nature200 = Color(0xFFC3ECD0);
-  static const Color nature300 = Color(0xFF94D9AC);
-  static const Color nature400 = Color(0xFF5BBC82);
-  static const Color nature500 = Color(0xFF34A062);
-  static const Color nature600 = Color(0xFF26814D);
-  static const Color nature700 = Color(0xFF226740);
-  static const Color nature800 = Color(0xFF1F5136);
-  static const Color nature900 = Color(0xFF1A432E);
-  static const Color nature950 = Color(0xFF0D2519);
-
-  // ============================================
-  // EARTH PALETTE (from tailwind.config.js)
-  // ============================================
-  static const Color earth50 = Color(0xFFFBF7F3);
-  static const Color earth100 = Color(0xFFF5EFE6);
-  static const Color earth200 = Color(0xFFEBDEC9);
-  static const Color earth300 = Color(0xFFDEC49F);
-  static const Color earth400 = Color(0xFFD0A775);
-  static const Color earth500 = Color(0xFFC68D53);
-  static const Color earth600 = Color(0xFFBA7444);
-  static const Color earth700 = Color(0xFF9B5B3A);
-  static const Color earth800 = Color(0xFF7F4B36);
-  static const Color earth900 = Color(0xFF673E2E);
-  static const Color earth950 = Color(0xFF371F17);
-
-  // ============================================
-  // DARK THEME COLORS (from App.css)
-  // ============================================
-  static const Color darkBg = Color(0xFF0F172A);
-  static const Color darkBgAlt = Color(0xFF0A0F0A);
-  static const Color darkBgSecondary = Color(0xFF0D1B0D);
-  static const Color cardBg = Color(0xB31E293B); // rgba(30, 41, 59, 0.7)
-  static const Color cardBgHover = Color(0xD91E293B); // rgba(30, 41, 59, 0.85)
-  static const Color glassBorder = Color(0x14FFFFFF); // rgba(255, 255, 255, 0.08)
-  static const Color glassBorderHover = Color(0x26FFFFFF); // rgba(255, 255, 255, 0.15)
+  static const Color success = Color(0xFF2E7D32);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color error = Color(0xFFD32F2F);
+  static const Color info = Color(0xFF1976D2);
 
   // ============================================
   // TEXT COLORS
   // ============================================
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textGreenLight = Color(0xFFE0FFE0);
-  static const Color textGreenSubtle = Color(0xCCE0FFE0); // 0.8 opacity
+  static const Color textPrimary = Color(0xFF1A1C1E);
+  static const Color textSecondary = Color(0xFF44474E);
+  static const Color textHint = Color(0xFF74777F);
 
   // ============================================
-  // UI COLORS
+  // NEUTRAL COLORS
   // ============================================
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color black = Color(0xFF000000);
-  static const Color gray50 = Color(0xFFF9FAFB);
-  static const Color gray100 = Color(0xFFF3F4F6);
-  static const Color gray200 = Color(0xFFE5E7EB);
-  static const Color gray300 = Color(0xFFD1D5DB);
-  static const Color gray400 = Color(0xFF9CA3AF);
-  static const Color gray500 = Color(0xFF6B7280);
-  static const Color gray600 = Color(0xFF4B5563);
-  static const Color gray700 = Color(0xFF374151);
-  static const Color gray800 = Color(0xFF1F2937);
-
-  // Status colors
-  static const Color success = Color(0xFF22C55E);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFEF4444);
-  static const Color info = Color(0xFF3B82F6);
-
-  // Feature card colors
-  static const Color blue100 = Color(0xFFDBEAFE);
-  static const Color blue50 = Color(0xFFEFF6FF);
-  static const Color blue500 = Color(0xFF3B82F6);
-  static const Color blue600 = Color(0xFF2563EB);
-  static const Color blue700 = Color(0xFF1D4ED8);
-
-  static const Color purple100 = Color(0xFFF3E8FF);
-  static const Color purple50 = Color(0xFFFAF5FF);
-  static const Color purple600 = Color(0xFF9333EA);
-
-  static const Color red100 = Color(0xFFFEE2E2);
-  static const Color red50 = Color(0xFFFEF2F2);
-  static const Color red500 = Color(0xFFEF4444);
+  static const Color gray100 = Color(0xFFF1F4F9);
+  static const Color gray200 = Color(0xFFE2E8F0);
+  static const Color gray400 = Color(0xFF94A3B8);
+  static const Color gray500 = Color(0xFF64748B);
+  static const Color gray600 = Color(0xFF475569);
+  static const Color gray700 = Color(0xFF334155);
+  static const Color gray800 = Color(0xFF1E293B);
 
   static const Color amber100 = Color(0xFFFEF3C7);
-  static const Color amber50 = Color(0xFFFFFBEB);
-  static const Color amber500 = Color(0xFFF59E0B);
-  static const Color amber600 = Color(0xFFD97706);
   static const Color amber700 = Color(0xFFB45309);
-
-  static const Color sky100 = Color(0xFFE0F2FE);
-  static const Color sky50 = Color(0xFFF0F9FF);
-  static const Color sky500 = Color(0xFF0EA5E9);
-
-  static const Color teal50 = Color(0xFFF0FDFA);
-  static const Color teal600 = Color(0xFF0D9488);
-
-  // Additional gray shades
-  static const Color gray900 = Color(0xFF111827);
-
-  // Additional red shades
   static const Color red400 = Color(0xFFF87171);
-  static const Color red600 = Color(0xFFDC2626);
 
-  // Additional purple shades
-  static const Color purple500 = Color(0xFFA855F7);
-  static const Color purple700 = Color(0xFF7C3AED);
-  // Additional shades for CropAdviceCard
-  static const Color blue200 = Color(0xFFBFDBFE);
-  static const Color purple200 = Color(0xFFE9D5FF);
-  static const Color red200 = Color(0xFFFECACA);
-  static const Color red300 = Color(0xFFFCA5A5);
-  static const Color amber200 = Color(0xFFFDE68A);
-  static const Color amber300 = Color(0xFFFCD34D);
-  static const Color amber800 = Color(0xFF92400E);
-  static const Color amber900 = Color(0xFF78350F);
+  // ============================================
+  // GRADIENTS
+  // ============================================
+  static const LinearGradient heroGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+  );
+
+  static const LinearGradient cardGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Colors.white, Color(0xFFF1F8F5)],
+  );
+
+  // ============================================
+  // SHADOWS
+  // ============================================
+  static const List<BoxShadow> softShadow = [
+    BoxShadow(
+      color: Color(0x0A000000),
+      blurRadius: 12,
+      offset: Offset(0, 4),
+    ),
+  ];
+
+  static const List<BoxShadow> smallShadow = [
+    BoxShadow(
+      color: Color(0x05000000),
+      blurRadius: 8,
+      offset: Offset(0, 2),
+    ),
+  ];
+
+  static const List<BoxShadow> mediumShadow = [
+    BoxShadow(
+      color: Color(0x14000000),
+      blurRadius: 16,
+      offset: Offset(0, 6),
+    ),
+  ];
 }

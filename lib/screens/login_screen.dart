@@ -1,19 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../services/auth_service.dart';
 import '../services/audio_service.dart';
 
 /// Screen for user authentication via Phone Number and OTP.
-/// 
-/// supports:
-/// - Entering a 10-digit mobile number.
-/// - Receiving and entering a 6-digit OTP.
-/// - Automatic OTP verification (on supported platforms/devices).
-/// - Resend OTP timer (US1).
-/// - Audio guidance for accessibility.
-/// 
-/// Equivalent to React's `LoginScreen.jsx`.
+/// Redesigned with AgriTech Premium Light theme.
 class LoginScreen extends StatefulWidget {
   final Function() onLogin;
   final VoidCallback onSkip;
@@ -36,14 +29,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _verificationId;
   
-  // US1: OTP Expiry Timer
   int _resendSeconds = 0;
   Timer? _resendTimer;
 
   @override
   void initState() {
     super.initState();
-    // Speak welcome message
     audioService.speakGuidance('welcome');
   }
 
@@ -55,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// Starts the 60-second countdown timer for resending OTP.
   void _startResendTimer() {
     setState(() {
       _resendSeconds = 60;
@@ -72,10 +62,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  /// Initiates the OTP sending process.
-  /// 
-  /// Validates the phone number and calls [AuthService.sendOtp].
-  /// Handles mock mode specific logic (e.g., showing the OTP in a snackbar).
   Future<void> _sendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.length != 10) {
@@ -96,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _step = 'otp';
             _verificationId = vid;
           });
-          _startResendTimer(); // Start expiry timer
+          _startResendTimer();
           _showMessage('OTP has been sent successfully');
           audioService.speakGuidance('otp');
         },
@@ -106,7 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
           audioService.confirmAction('error', message: 'Verification failed');
         },
         onVerificationCompleted: (credential) async {
-          // Auto-resolution (on Android)
           setState(() => _loading = false);
           _showMessage('Phone number verified automatically');
           widget.onLogin();
@@ -118,7 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Verifies the entered OTP code.
   Future<void> _verifyOtp() async {
     if (_otpController.text.length != 6) {
       _showMessage('Please enter 6-digit OTP');
@@ -151,15 +135,18 @@ class _LoginScreenState extends State<LoginScreen> {
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 768;
+    final isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
     );
   }
@@ -167,52 +154,53 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildDesktopLayout() {
     return Row(
       children: [
-        // Left Section - Brand Info
+        // Branding Side
         Expanded(
+          flex: 4,
           child: Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.primaryGreen,
-                  AppColors.secondaryGreen,
-                ],
-              ),
+              gradient: AppColors.heroGradient,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(60),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'CropAid 🌾',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+            padding: const EdgeInsets.all(80),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'CROP AID',
+                  style: TextStyle(
+                    fontSize: 56,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 4,
                   ),
-                  const SizedBox(height: 25),
-                  Text(
-                    'Smart Crop Diagnosis & Farmer Support Platform.\n\nGet expert help, insights, and grow better.',
-                    style: TextStyle(
-                      fontSize: 20,
-                      color: Colors.white.withOpacity(0.9),
-                      height: 1.6,
-                    ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'A farmer-first AI platform for healthier crops and better yields.',
+                  style: TextStyle(
+                    fontSize: 24,
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 48),
+                _buildValueProp(LucideIcons.scan, 'Advanced AI Diagnostics'),
+                const SizedBox(height: 16),
+                _buildValueProp(LucideIcons.messageCircle, 'Expert Support Chat'),
+                const SizedBox(height: 16),
+                _buildValueProp(LucideIcons.history, 'Full Diagnosis History'),
+              ],
             ),
           ),
         ),
 
-        // Right Section - Login Form
+        // Form Side
         Expanded(
+          flex: 5,
           child: Container(
-            color: AppColors.gray50,
+            color: AppColors.background,
             child: Center(
               child: _buildLoginCard(),
             ),
@@ -222,219 +210,146 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildMobileLayout() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primaryGreen,
-            AppColors.secondaryGreen,
-          ],
+  Widget _buildValueProp(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white.withOpacity(0.7), size: 24),
+        const SizedBox(width: 16),
+        Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
         ),
-      ),
-      child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // Brand Info
-                const Text(
-                  'CropAid 🌾',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Stack(
+      children: [
+        Container(
+          height: 320,
+          decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+        ),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              child: Column(
+                children: [
+                  const Icon(LucideIcons.leaf, size: 60, color: Colors.white),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'CROP AID',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Smart Crop Diagnosis & Farmer Support Platform.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
-                
-                // Login Card
-                _buildLoginCard(),
-              ],
+                  const SizedBox(height: 48),
+                  _buildLoginCard(),
+                ],
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildLoginCard() {
     return Container(
-      constraints: const BoxConstraints(maxWidth: 400),
+      constraints: const BoxConstraints(maxWidth: 450),
       width: double.infinity,
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: AppColors.mediumShadow,
+        border: Border.all(color: AppColors.primary.withOpacity(0.05)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title
-          Text(
-            'Farmer Login',
+          const Text(
+            'Welcome',
             style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primaryGreen,
-              letterSpacing: 1,
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 35),
+          const SizedBox(height: 8),
+          const Text(
+            'Enter your details to continue',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 40),
 
-          // Phone Input
+          // Phone Number Step
           if (_step == 'phone') ...[
-            TextField(
+            _buildInputField(
               controller: _phoneController,
+              hint: 'Mobile Number',
+              icon: LucideIcons.phone,
               keyboardType: TextInputType.phone,
               maxLength: 10,
-              decoration: InputDecoration(
-                hintText: 'Enter Mobile Number',
-                counterText: '',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.secondaryGreen, width: 2),
-                ),
-                contentPadding: const EdgeInsets.all(16),
-              ),
-              onChanged: (value) {
-                // Only allow digits
-                final cleaned = value.replaceAll(RegExp(r'[^0-9]'), '');
-                if (cleaned != value) {
-                  _phoneController.text = cleaned;
-                  _phoneController.selection = TextSelection.fromPosition(
-                    TextPosition(offset: cleaned.length),
-                  );
-                }
-              },
             ),
-            const SizedBox(height: 22),
-            
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _sendOtp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  _loading ? 'Sending...' : 'Send OTP',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            const SizedBox(height: 32),
+            _buildPrimaryButton(
+              onPressed: _loading ? null : _sendOtp,
+              text: _loading ? 'SENDING...' : 'SEND OTP',
             ),
           ],
 
-          // OTP Input
+          // OTP Step
           if (_step == 'otp') ...[
-            TextField(
+            _buildInputField(
               controller: _otpController,
+              hint: 'Enter 6-digit OTP',
+              icon: LucideIcons.lock,
               keyboardType: TextInputType.number,
-              autofillHints: const [AutofillHints.oneTimeCode], // US1: Auto-read support
-              decoration: InputDecoration(
-                hintText: 'Enter OTP',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFCCCCCC), width: 1.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.secondaryGreen, width: 2),
-                ),
-                contentPadding: const EdgeInsets.all(16),
-              ),
+              maxLength: 6,
             ),
-            const SizedBox(height: 22),
-            
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _verifyOtp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  _loading ? 'Verifying...' : 'Verify & Login',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            // US1: Resend Logic with Timer
-            Center(
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
               child: _resendSeconds > 0
                   ? Text(
-                      'Resend OTP in ${_resendSeconds}s',
-                      style: TextStyle(color: AppColors.gray500),
+                      'Resend in ${_resendSeconds}s',
+                      style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                     )
                   : TextButton(
                       onPressed: _loading ? null : _sendOtp,
-                      child: const Text('Resend OTP'),
+                      child: const Text('RESEND OTP', style: TextStyle(fontWeight: FontWeight.w800)),
                     ),
+            ),
+            const SizedBox(height: 24),
+            _buildPrimaryButton(
+              onPressed: _loading ? null : _verifyOtp,
+              text: _loading ? 'VERIFYING...' : 'LOGIN',
             ),
           ],
 
-          // Skip Login
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: widget.onSkip,
-            child: Text(
-              'Skip Login →',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.gray500,
+          const SizedBox(height: 24),
+          Center(
+            child: TextButton(
+              onPressed: widget.onSkip,
+              child: const Text(
+                'SKIP FOR NOW →',
+                style: TextStyle(
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
           ),
@@ -442,4 +357,66 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+    int? maxLength,
+    List<String>? autofillHints,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLength: maxLength,
+        autofillHints: autofillHints,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: 1),
+        onChanged: (value) {
+          if (keyboardType == TextInputType.phone) {
+             final cleaned = value.replaceAll(RegExp(r'[^0-9]'), '');
+             if (cleaned != value) {
+               controller.text = cleaned;
+               controller.selection = TextSelection.fromPosition(TextPosition(offset: cleaned.length));
+             }
+          }
+        },
+        decoration: InputDecoration(
+          hintText: hint,
+          counterText: '',
+          prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(20),
+          hintStyle: const TextStyle(color: AppColors.textHint, fontWeight: FontWeight.w500, letterSpacing: 0),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton({required VoidCallback? onPressed, required String text}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+        ),
+      ),
+    );
+  }
 }
+

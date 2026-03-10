@@ -28,7 +28,7 @@ class TreatmentStepsWidget extends StatelessWidget {
             Text(
               title,
               style: const TextStyle(
-                color: Colors.white,
+                color: Color(0xFF1B1B1B),
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -87,7 +87,7 @@ class TreatmentStepsWidget extends StatelessWidget {
                         Text(
                           step,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFF4F4F4F),
                             fontSize: 15,
                             height: 1.5,
                           ),

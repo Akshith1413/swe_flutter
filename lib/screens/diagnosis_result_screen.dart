@@ -10,19 +10,16 @@ import '../services/feedback_service.dart';
 import '../services/explanation_service.dart';
 import '../services/preferences_service.dart';
 import '../services/sarvam_tts_service.dart';
+import '../services/tts_service.dart';
 import '../widgets/treatment_steps_widget.dart';
+import '../widgets/diagnosis_result_card.dart';
+import '../widgets/advice_card.dart';
+import '../widgets/treatment_card.dart';
+import '../core/theme/app_colors.dart';
 import 'chatbot_view.dart';
 import 'dart:developer' as dev;
 
 /// Full-screen diagnosis result screen (US17-20).
-///
-/// Displays:
-/// - Disease identification card with crop label (US17)
-/// - Animated confidence score with circular progress (US18)
-/// - Top-5 alternative predictions bar chart (US18)
-/// - Severity badge with color-coded indicator (US19)
-/// - Toggleable Grad-CAM heatmap overlay on original image (US20)
-/// - "View Full Report" → opens CropAdviceCard bottom sheet
 class DiagnosisResultScreen extends StatefulWidget {
   final AnalysisResult result;
   final VoidCallback onClose;
@@ -45,32 +42,24 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
 
-  // US31: Prevention checklist state
   final Set<int> _checkedItems = {};
 
-  // US32: Feedback state
-  String? _feedbackRating; // 'helpful' or 'not_helpful'
+  String? _feedbackRating; 
   bool _showCommentBox = false;
   final TextEditingController _commentController = TextEditingController();
   bool _feedbackSubmitted = false;
   bool _feedbackSubmitting = false;
 
-  // ── Language & Translation state ──────────────────────────────────────
-  /// Currently active language for the page (e.g. 'te', 'en')
   String _activeLangCode = 'en';
 
-  /// All translated strings for the page, keyed by an internal ID.
-  /// While null the page shows English. Once populated it replaces
-  /// every text widget. Falls back to English gracefully.
-  Map<String, String>? _translations;          // flat strings
-  List<String>? _txTreatmentSteps;             // translated steps list
-  List<String>? _txPreventionChecklist;        // translated prevention list
-  List<String>? _txTopPredictionNames;         // translated disease names
+  Map<String, String>? _translations;          
+  List<String>? _txTreatmentSteps;             
+  List<String>? _txPreventionChecklist;        
+  List<String>? _txTopPredictionNames;         
 
   bool _isTranslating = false;
   String? _translationError;
 
-  // ── Audio state ────────────────────────────────────────────────────────
   bool _isLoadingAudio = false;
   bool _isPlayingAudio = false;
 
@@ -100,12 +89,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     _loadInitialLanguage();
   }
 
-  /// Read saved language from preferences, then kick-off translation
   Future<void> _loadInitialLanguage() async {
     final langCode = await preferencesService.getLanguage() ?? 'en';
     final mappedCode = SarvamTTSService.mapToSarvamCode(langCode);
     if (mounted && mappedCode != 'en') {
-      // Delay slightly so the page renders in English first
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) _changeLanguage(mappedCode);
     } else if (mounted) {
@@ -113,17 +100,12 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     }
   }
 
-  // ── Translation logic ──────────────────────────────────────────────────
-
-  /// Collect every English string that needs translating and send as one batch.
-  /// Indices are used to split the flat response back into named groups.
   Future<void> _changeLanguage(String langCode) async {
     if (_isTranslating) return;
     setState(() {
       _activeLangCode = langCode;
       _isTranslating = true;
       _translationError = null;
-      // Stop any audio if playing
       if (_isPlayingAudio) {
         SarvamTTSService.stop();
         _isPlayingAudio = false;
@@ -138,24 +120,21 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       final severityDesc = r.severityDescription;
       final timelineDesc = r.recoveryTimeline['description'] as String? ?? '';
 
-      // Collect top-prediction disease names
       final predNames = r.topPredictions
           .map((p) => p['disease'] as String? ?? '')
           .toList();
 
-      // Flat list order (remember indices!)
       final allTexts = [
-        diseaseName,          // 0
-        simpleExp,            // 1
-        severityDesc,         // 2
-        timelineDesc,         // 3
-        ...r.treatmentSteps,  // 4 .. 4+steps.len-1
-        ...r.preventionChecklist, // next block
-        ...predNames,         // last block
+        diseaseName,          
+        simpleExp,            
+        severityDesc,         
+        timelineDesc,         
+        ...r.treatmentSteps,  
+        ...r.preventionChecklist, 
+        ...predNames,         
       ];
 
       if (langCode == 'en') {
-        // English: reset to original
         setState(() {
           _translations = null;
           _txTreatmentSteps = null;
@@ -198,14 +177,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     }
   }
 
-  /// Helper: return translated string if available, else English fallback.
   String _tx(String key, String englishFallback) {
     return _translations?[key] ?? englishFallback;
   }
 
-  // ── Audio playback ─────────────────────────────────────────────────────
-
-  /// Build the full page narration string from translated (or English) text
   String _buildNarrationText() {
     final r = widget.result;
     final disease = _tx('diseaseName', _formatDiseaseName(r.disease));
@@ -229,25 +204,42 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
 
     if (_isPlayingAudio) {
       await SarvamTTSService.stop();
+      await TTSService.stop();
       if (mounted) setState(() => _isPlayingAudio = false);
       return;
     }
 
     setState(() { _isLoadingAudio = true; });
 
-    await SarvamTTSService.speak(
-      text: _buildNarrationText(),
-      langCode: _activeLangCode,
-      onStart: () {
-        if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = true; });
-      },
-      onComplete: () {
-        if (mounted) setState(() => _isPlayingAudio = false);
-      },
-      onError: (_) {
-        if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = false; });
-      },
-    );
+    try {
+      await SarvamTTSService.speak(
+        text: _buildNarrationText(),
+        langCode: _activeLangCode,
+        onStart: () {
+          if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = true; });
+        },
+        onComplete: () {
+          if (mounted) setState(() => _isPlayingAudio = false);
+        },
+        onError: (err) async {
+          debugPrint('Sarvam TTS failed, falling back to native: $err');
+          // Fallback to native TTS if Sarvam fails (e.g. backend down)
+          await _playNativeFallback();
+        },
+      );
+    } catch (e) {
+      await _playNativeFallback();
+    }
+  }
+
+  Future<void> _playNativeFallback() async {
+    try {
+      if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = true; });
+      await TTSService.speakText(_buildNarrationText(), _activeLangCode);
+      if (mounted) setState(() => _isPlayingAudio = false);
+    } catch (e) {
+      if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = false; });
+    }
   }
 
   @override
@@ -287,51 +279,47 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     );
   }
 
-  // ==================== SEVERITY HELPERS ====================
-
   Color _severityColor(String level) {
     switch (level.toLowerCase()) {
       case 'severe':
-        return const Color(0xFFEF4444);
+        return AppColors.error;
       case 'moderate':
-        return const Color(0xFFF59E0B);
+        return AppColors.warning;
       case 'mild':
-        return const Color(0xFF0EA5E9);
+        return AppColors.info;
       case 'healthy':
-        return const Color(0xFF22C55E);
+        return AppColors.success;
       default:
-        return const Color(0xFF94A3B8);
+        return AppColors.gray400;
     }
   }
 
   IconData _severityIcon(String level) {
     switch (level.toLowerCase()) {
       case 'severe':
-        return Icons.dangerous_rounded;
+        return LucideIcons.alertOctagon;
       case 'moderate':
-        return Icons.warning_amber_rounded;
+        return LucideIcons.alertTriangle;
       case 'mild':
-        return Icons.info_outline_rounded;
+        return LucideIcons.info;
       case 'healthy':
-        return Icons.check_circle_rounded;
+        return LucideIcons.checkCircle2;
       default:
-        return Icons.help_outline_rounded;
+        return LucideIcons.helpCircle;
     }
   }
 
   Color _confidenceColor(double confidence) {
-    if (confidence >= 0.85) return const Color(0xFF22C55E);
-    if (confidence >= 0.70) return const Color(0xFF10B981);
-    if (confidence >= 0.55) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
+    if (confidence >= 0.85) return AppColors.success;
+    if (confidence >= 0.70) return AppColors.primary;
+    if (confidence >= 0.55) return AppColors.warning;
+    return AppColors.error;
   }
-
-  // ==================== BUILD ====================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1A),
+      backgroundColor: AppColors.background,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: CustomScrollView(
@@ -348,15 +336,23 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
-                    // ── Language selector + audio bar ──────────────────
+                    const SizedBox(height: 16),
                     _buildLanguageAudioBar(),
-                    const SizedBox(height: 14),
-                    // ── Content sections use translated text ───────────
-                    _buildDiseaseIdentificationCard(),
-                    const SizedBox(height: 12),
-                    _buildSimpleExplanationCard(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                    DiagnosisResultCard(
+                      diseaseName: _tx('diseaseName', _formatDiseaseName(widget.result.disease)),
+                      cropName: widget.result.crop,
+                      confidence: widget.result.confidence,
+                      imagePath: widget.result.imageUrl,
+                      onHeatmapTap: widget.result.heatmapBase64 != null ? () => setState(() => _showHeatmap = !_showHeatmap) : null,
+                    ),
+                    const SizedBox(height: 16),
+                    AdviceCard(
+                      title: "AI Analysis",
+                      content: _tx('simpleExp', ExplanationService.getSimpleExplanation(widget.result.disease)),
+                      icon: LucideIcons.sparkles,
+                    ),
+                    const SizedBox(height: 24),
                     _buildMetricsRow(),
                     const SizedBox(height: 24),
                     _buildMultipleDetectionsView(),
@@ -392,50 +388,38 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
         sarvamTTSLanguages.last;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
-        ),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: AppColors.softShadow,
         border: Border.all(
-          color: const Color(0xFF6366F1).withOpacity(0.3),
+          color: AppColors.primary.withOpacity(0.05),
           width: 1.2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.08),
-            blurRadius: 20,
-            spreadRadius: 1,
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with audio button
           Row(
             children: [
-              Icon(
-                Icons.translate_rounded,
-                size: 15,
-                color: const Color(0xFF818CF8).withOpacity(0.9),
+              const Icon(
+                LucideIcons.languages,
+                size: 16,
+                color: AppColors.primary,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _isTranslating
-                      ? 'Translating page to ${activeLang.name}...'
+                      ? 'Translating to ${activeLang.name}...'
                       : _activeLangCode == 'en'
-                          ? 'Select language to translate page'
-                          : 'Page translated to ${activeLang.nativeName}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                          ? 'Select your language'
+                          : 'Viewing in ${activeLang.nativeName}',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.gray600,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ),
               if (_isTranslating)
@@ -443,31 +427,29 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                    strokeWidth: 1.8,
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF818CF8)),
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                   ),
                 )
               else
-                // Audio play/stop button
                 GestureDetector(
                   onTap: _toggleAudio,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: _isPlayingAudio
-                            ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                            : [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+                            ? [AppColors.error, AppColors.error.withOpacity(0.8)]
+                            : [AppColors.primary, AppColors.nature600],
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(100),
                       boxShadow: [
                         BoxShadow(
-                          color: (_isPlayingAudio
-                                  ? const Color(0xFFEF4444)
-                                  : const Color(0xFF6366F1))
-                              .withOpacity(0.35),
-                          blurRadius: 8,
+                          color: (_isPlayingAudio ? AppColors.error : AppColors.primary)
+                              .withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -485,22 +467,18 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                               )
                             : Icon(
                                 _isPlayingAudio
-                                    ? Icons.stop_rounded
-                                    : Icons.volume_up_rounded,
-                                size: 14,
+                                    ? LucideIcons.stopCircle
+                                    : LucideIcons.volume2,
+                                size: 16,
                                 color: Colors.white,
                               ),
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 6),
                         Text(
-                          _isLoadingAudio
-                              ? 'Loading...'
-                              : _isPlayingAudio
-                                  ? 'Stop'
-                                  : 'Listen',
+                          _isLoadingAudio ? '...' : _isPlayingAudio ? 'Stop' : 'Listen',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -510,42 +488,36 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
             ],
           ),
           if (_translationError != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               _translationError!,
-              style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11),
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
             ),
           ],
-          const SizedBox(height: 10),
-          // Language chips
+          const SizedBox(height: 16),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 8,
+            runSpacing: 8,
             children: sarvamTTSLanguages.map((lang) {
               final isSelected = _activeLangCode == lang.code;
               return GestureDetector(
                 onTap: _isTranslating ? null : () => _changeLanguage(lang.code),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF6366F1).withOpacity(0.3)
-                        : Colors.white.withOpacity(0.05),
+                    color: isSelected ? AppColors.primary : AppColors.tan100,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF818CF8)
-                          : Colors.white.withOpacity(0.1),
-                      width: isSelected ? 1.5 : 1,
+                      color: isSelected ? AppColors.primary : Colors.transparent,
                     ),
                   ),
                   child: Text(
                     lang.nativeName,
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                      color: isSelected ? Colors.white : AppColors.gray800,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -557,19 +529,21 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     );
   }
 
+
   // ==================== IMAGE HEADER WITH HEATMAP TOGGLE ====================
 
   Widget _buildImageHeader() {
     return SliverAppBar(
-      expandedHeight: 320,
+      expandedHeight: 340,
       pinned: true,
       automaticallyImplyLeading: false,
-      backgroundColor: const Color(0xFF0A0F1A),
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      elevation: 0,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
           children: [
-            // Original image or heatmap overlay
             if (_showHeatmap && widget.result.heatmapBase64 != null)
               Image.memory(
                 base64Decode(widget.result.heatmapBase64!),
@@ -579,62 +553,59 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
             else
               _buildOriginalImage(),
 
-            // Gradient overlay for text readability
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
+                    Colors.black26,
                     Colors.transparent,
-                    Color(0xCC0A0F1A),
-                    Color(0xFF0A0F1A),
+                    Colors.black54,
                   ],
-                  stops: [0.4, 0.85, 1.0],
                 ),
               ),
             ),
 
-            // Heatmap toggle button (US20)
             if (widget.result.heatmapBase64 != null)
               Positioned(
-                bottom: 70,
-                right: 16,
+                bottom: 80,
+                right: 20,
                 child: _buildHeatmapToggle(),
               ),
 
-            // Crop label at bottom
             Positioned(
-              bottom: 16,
+              bottom: 24,
               left: 20,
-              right: 80,
+              right: 20,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                      color: AppColors.primary.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
-                      widget.result.crop,
+                      widget.result.crop.toUpperCase(),
                       style: const TextStyle(
-                        color: Color(0xFF6EE7B7),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   Text(
                     _formatDiseaseName(widget.result.disease),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 2))],
                     ),
                   ),
                 ],
@@ -643,21 +614,19 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           ],
         ),
       ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 12, top: 4),
-          decoration: BoxDecoration(
-            color: Colors.black45,
-            borderRadius: BorderRadius.circular(12),
-          ),
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: CircleAvatar(
+          backgroundColor: Colors.white,
           child: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white, size: 22),
+            icon: const Icon(Icons.close, color: AppColors.gray800, size: 20),
             onPressed: widget.onClose,
           ),
         ),
-      ],
+      ),
     );
   }
+
 
   Widget _buildOriginalImage() {
     if (kIsWeb) {
@@ -859,19 +828,16 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   // ==================== TREATMENT STEPS (US25) ====================
 
   Widget _buildTreatmentStepsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF10B981).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.1)),
-      ),
-      child: TreatmentStepsWidget(
-        steps: _txTreatmentSteps ?? widget.result.treatmentSteps,
-        themeColor: const Color(0xFF10B981),
-      ),
+    final steps = _txTreatmentSteps ?? widget.result.treatmentSteps;
+    return TreatmentCard(
+      title: "Recovery Plan",
+      instructions: steps,
+      type: widget.result.disease.toLowerCase().contains('healthy') 
+          ? TreatmentType.organic : TreatmentType.chemical,
+      dosage: "Follow local agricultural guidelines",
     );
   }
+
 
   // ==================== CONFIDENCE + SEVERITY METRICS (US18 + US19) ====================
 
@@ -890,29 +856,27 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   Widget _buildConfidenceCard() {
     final color = _confidenceColor(widget.result.confidence);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppColors.softShadow,
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.radar, size: 14, color: Colors.white.withOpacity(0.5)),
-              const SizedBox(width: 6),
+              const Icon(LucideIcons.activity, size: 14, color: AppColors.gray400),
+              const SizedBox(width: 8),
               Text(
                 'Confidence',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.gray500,
+                    ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           AnimatedBuilder(
             animation: _confidenceAnim,
             builder: (context, child) {
@@ -927,8 +891,8 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                       height: 80,
                       child: CircularProgressIndicator(
                         value: _confidenceAnim.value,
-                        strokeWidth: 6,
-                        backgroundColor: Colors.white.withOpacity(0.08),
+                        strokeWidth: 8,
+                        backgroundColor: AppColors.tan100,
                         valueColor: AlwaysStoppedAnimation<Color>(color),
                         strokeCap: StrokeCap.round,
                       ),
@@ -937,8 +901,8 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                       '${(_confidenceAnim.value * 100).toInt()}%',
                       style: TextStyle(
                         color: color,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
@@ -946,25 +910,20 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
               );
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(6),
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(100),
             ),
             child: Text(
-              widget.result.confidence >= 0.85
-                  ? 'Very High'
-                  : widget.result.confidence >= 0.70
-                      ? 'High'
-                      : widget.result.confidence >= 0.55
-                          ? 'Medium'
-                          : 'Low',
+              widget.result.confidence >= 0.85 ? 'OPTIMAL' : 'RELIABLE',
               style: TextStyle(
                 color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -980,69 +939,50 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     final label = widget.result.severity;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppColors.softShadow,
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.monitor_heart_outlined,
-                  size: 14, color: Colors.white.withOpacity(0.5)),
-              const SizedBox(width: 6),
+              const Icon(LucideIcons.thermometer, size: 14, color: AppColors.gray400),
+              const SizedBox(width: 8),
               Text(
-                'Severity',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+                'Urgency',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.gray500,
+                    ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Severity icon with glow
+          const SizedBox(height: 20),
           Container(
             width: 80,
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withOpacity(0.12),
-              border: Border.all(color: color.withOpacity(0.3), width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.2),
-                  blurRadius: 16,
-                  spreadRadius: 2,
-                ),
-              ],
+              color: color.withOpacity(0.1),
             ),
             child: Icon(icon, color: color, size: 36),
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.3)),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
+          const SizedBox(height: 16),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
       ),
     );
   }
+
 
   // ==================== TOP-5 PREDICTIONS CHART (US18) ====================
 
@@ -1085,65 +1025,56 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     final conf = (pred['confidence'] as num? ?? 0).toDouble();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF472B6).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF472B6).withOpacity(0.2)),
+        color: AppColors.accent.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF472B6).withOpacity(0.2),
+              color: AppColors.accent.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(LucideIcons.alertCircle, color: Color(0xFFF472B6), size: 16),
+            child: const Icon(LucideIcons.alertCircle, color: AppColors.accent, size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   disease,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 Text(
-                  'Possible co-infection found',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
-                  ),
+                  'Secondary concern detected',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray500,
+                      ),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '${(conf * 100).toInt()}%',
-              style: const TextStyle(
-                color: Color(0xFFF472B6),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+          Text(
+            '${(conf * 100).toInt()}%',
+            style: const TextStyle(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
             ),
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildTopPredictionsChart() {
     final predictions = widget.result.topPredictions;
@@ -1154,112 +1085,73 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.barChart, size: 18, color: Color(0xFF818CF8)),
+            const Icon(LucideIcons.barChart3, size: 18, color: AppColors.info),
             const SizedBox(width: 8),
-            const Text(
-              'Top Predictions',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Alternative Possibilities',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppColors.softShadow,
           ),
           child: Column(
             children: predictions.asMap().entries.map((entry) {
               final idx = entry.key;
               final pred = entry.value;
               final conf = (pred['confidence'] as num?)?.toDouble() ?? 0.0;
-              // Use translated disease name if available
               final disease = (_txTopPredictionNames != null && idx < _txTopPredictionNames!.length)
                   ? _txTopPredictionNames![idx]
                   : (pred['disease'] as String? ?? 'Unknown');
               final crop = pred['crop'] as String? ?? '';
               final isTop = idx == 0;
 
-              final barColor = isTop
-                  ? const Color(0xFF10B981)
-                  : [
-                      const Color(0xFF818CF8),
-                      const Color(0xFF38BDF8),
-                      const Color(0xFFFBBF24),
-                      const Color(0xFFF87171),
-                    ][min(idx - 1, 3)];
+              final barColor = isTop ? AppColors.success : AppColors.info;
 
               return Padding(
-                padding: EdgeInsets.only(bottom: idx < predictions.length - 1 ? 10 : 0),
-                child: Row(
+                padding: EdgeInsets.only(bottom: idx < predictions.length - 1 ? 16 : 0),
+                child: Column(
                   children: [
-                    SizedBox(
-                      width: 20,
-                      child: Text(
-                        '${idx + 1}',
-                        style: TextStyle(
-                          color: isTop ? const Color(0xFF10B981) : Colors.white38,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
                             disease,
                             style: TextStyle(
-                              color: isTop ? Colors.white : Colors.white70,
-                              fontSize: 13,
-                              fontWeight: isTop ? FontWeight.w600 : FontWeight.normal,
+                              color: isTop ? AppColors.textPrimary : AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: isTop ? FontWeight.bold : FontWeight.w500,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (crop.isNotEmpty)
-                            Text(
-                              crop,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.35),
-                                fontSize: 11,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 4,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: conf,
-                          minHeight: 8,
-                          backgroundColor: Colors.white.withOpacity(0.06),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            barColor.withOpacity(isTop ? 1.0 : 0.6),
+                        ),
+                        Text(
+                          '${(conf * 100).toInt()}%',
+                          style: TextStyle(
+                            color: isTop ? AppColors.primary : AppColors.textHint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 44,
-                      child: Text(
-                        '${(conf * 100).toStringAsFixed(1)}%',
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: isTop ? barColor : Colors.white54,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: LinearProgressIndicator(
+                        value: conf,
+                        minHeight: 6,
+                        backgroundColor: AppColors.tan100,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          barColor.withOpacity(isTop ? 1.0 : 0.6),
                         ),
                       ),
                     ),
@@ -1273,10 +1165,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     );
   }
 
+
   // ==================== UNCERTAINTY WARNING (US21) ====================
 
   Widget _buildUncertaintyBanner() {
-    // Task: Log low-confidence predictions for monitoring
     dev.log(
       'Low confidence prediction detected',
       name: 'CropAID.Diagnosis',
@@ -1285,43 +1177,46 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF59E0B).withOpacity(0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+        color: AppColors.warning.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
       ),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.2),
+                  color: AppColors.warning.withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warning_amber_rounded,
-                    color: Color(0xFFFBBF24), size: 20),
+                child: const Icon(LucideIcons.alertTriangle,
+                    color: AppColors.warning, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Uncertain Diagnosis',
+                      'UNCERTAIN RESULT',
                       style: TextStyle(
-                        color: Color(0xFFFBBF24),
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                        color: AppColors.warning,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
                       ),
                     ),
+                    SizedBox(height: 4),
                     Text(
-                      'AI confidence is lower than usual. Please verify results.',
+                      'AI confidence is lower than usual. We recommend verification.',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.gray700,
                         fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -1329,21 +1224,20 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: widget.onClose,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Retry Capture'),
+                  icon: const Icon(LucideIcons.refreshCw, size: 16),
+                  label: const Text('RETRY'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    foregroundColor: AppColors.gray800,
+                    side: const BorderSide(color: AppColors.gray300),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ),
@@ -1351,16 +1245,15 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _openExpertConsult,
-                  icon: const Icon(LucideIcons.bot, size: 18),
-                  label: const Text('Expert Consult'),
+                  icon: const Icon(LucideIcons.bot, size: 16),
+                  label: const Text('EXPERT AI'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    foregroundColor: Colors.black87,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ),
@@ -1371,6 +1264,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     );
   }
 
+
   void _openExpertConsult() {
     showModalBottomSheet(
       context: context,
@@ -1378,6 +1272,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       backgroundColor: Colors.transparent,
       builder: (context) => ChatbotView(
         onClose: () => Navigator.pop(context),
+        context: widget.result,
       ),
     );
   }
@@ -1392,43 +1287,37 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     if (description.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.15)),
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.1)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(_severityIcon(level), color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
+          Icon(LucideIcons.target, color: color, size: 22),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Severity Assessment',
+                  'Expert Assessment',
                   style: TextStyle(
                     color: color,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   description,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                    height: 1.4,
+                  style: const TextStyle(
+                    color: AppColors.gray700,
+                    fontSize: 15,
+                    height: 1.5,
                   ),
                 ),
               ],
@@ -1438,6 +1327,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       ),
     );
   }
+
 
   // ==================== RECOVERY TIMELINE (US30) ====================
 
@@ -1450,9 +1340,9 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     final monitorDays = timeline['monitoringDays'] ?? '30';
 
     final steps = [
-      _TimelineStep('Initial\nImprovement', '$initialDays days', const Color(0xFF38BDF8), LucideIcons.sprout),
-      _TimelineStep('Full\nRecovery', '$fullDays days', const Color(0xFF10B981), LucideIcons.activity),
-      _TimelineStep('Monitoring\nPeriod', '$monitorDays days', const Color(0xFF818CF8), LucideIcons.eye),
+      _TimelineStep('Treatment', '$initialDays days', AppColors.info, LucideIcons.droplets),
+      _TimelineStep('Recovery', '$fullDays days', AppColors.success, LucideIcons.sprout),
+      _TimelineStep('Stability', '$monitorDays days', AppColors.nature600, LucideIcons.shieldCheck),
     ];
 
     return Column(
@@ -1460,29 +1350,26 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.clock, size: 18, color: Color(0xFF38BDF8)),
+            const Icon(LucideIcons.calendarDays, size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
-            const Text(
-              'Recovery Timeline',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Expected Timeline',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppColors.softShadow,
           ),
           child: Column(
             children: [
-              // Timeline bar
               Row(
                 children: steps.asMap().entries.expand((entry) {
                   final idx = entry.key;
@@ -1492,39 +1379,33 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                       child: Column(
                         children: [
                           Container(
-                            width: 44,
-                            height: 44,
+                            width: 50,
+                            height: 50,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: step.color.withOpacity(0.15),
-                              border: Border.all(color: step.color.withOpacity(0.5), width: 2),
+                              color: step.color.withOpacity(0.1),
+                              border: Border.all(color: step.color.withOpacity(0.2), width: 2),
                             ),
-                            child: Icon(step.icon, color: step.color, size: 20),
+                            child: Icon(step.icon, color: step.color, size: 22),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Text(
                             step.label,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                            style: const TextStyle(
+                              color: AppColors.gray800,
                               fontSize: 11,
+                              fontWeight: FontWeight.bold,
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: step.color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              step.duration,
-                              style: TextStyle(
-                                color: step.color,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const SizedBox(height: 6),
+                          Text(
+                            step.duration,
+                            style: TextStyle(
+                              color: step.color,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
@@ -1532,55 +1413,35 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                     ),
                   ];
 
-                  // Add connector line between steps
                   if (idx < steps.length - 1) {
                     widgets.add(
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 40),
-                        child: SizedBox(
-                          width: 24,
-                          child: Center(
-                            child: Container(
-                              height: 2,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [step.color.withOpacity(0.4), steps[idx + 1].color.withOpacity(0.4)],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        padding: const EdgeInsets.only(bottom: 50),
+                        child: Icon(LucideIcons.chevronRight, 
+                          size: 16, color: AppColors.gray300),
                       ),
                     );
                   }
                   return widgets;
                 }).toList(),
               ),
-              // Description
               if (timeline['description'] != null && (timeline['description'] as String).isNotEmpty) ...[
-                const SizedBox(height: 14),
+                const SizedBox(height: 20),
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.tan100,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline, size: 14, color: Colors.white.withOpacity(0.4)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _tx('timelineDesc', timeline['description'] as String? ?? ''),
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 12,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    _tx('timelineDesc', timeline['description'] as String? ?? ''),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.gray600,
+                      fontSize: 13,
+                      height: 1.5,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
               ],
@@ -1590,6 +1451,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       ],
     );
   }
+
 
   // ==================== PREVENTION CHECKLIST (US31) ====================
 
@@ -1606,139 +1468,98 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.shield, size: 18, color: Color(0xFF22C55E)),
+            const Icon(LucideIcons.shieldCheck, size: 18, color: AppColors.success),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Prevention Checklist',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                ),
+                'Care Checklist',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
               ),
             ),
-            // Progress indicator
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF22C55E).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
                 '$completedCount/$totalCount',
                 style: const TextStyle(
-                  color: Color(0xFF22C55E),
+                  color: AppColors.success,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        // Progress bar
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 4,
-            backgroundColor: Colors.white.withOpacity(0.06),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
-          ),
-        ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppColors.softShadow,
           ),
           child: Column(
-            children: checklist.asMap().entries.map((entry) {
-              final idx = entry.key;
-              // Use translated item if available
-              final tip = (_txPreventionChecklist != null && idx < _txPreventionChecklist!.length)
-                  ? _txPreventionChecklist![idx]
-                  : entry.value;
-              final isChecked = _checkedItems.contains(idx);
-
-              return InkWell(
-                onTap: () {
-                  setState(() {
-                    if (isChecked) {
-                      _checkedItems.remove(idx);
-                    } else {
-                      _checkedItems.add(idx);
-                    }
-                  });
-                },
-                borderRadius: BorderRadius.circular(idx == 0
-                    ? 18
-                    : idx == checklist.length - 1
-                        ? 18
-                        : 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: idx < checklist.length - 1
-                        ? Border(
-                            bottom: BorderSide(
-                              color: Colors.white.withOpacity(0.05),
-                            ),
-                          )
-                        : null,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isChecked
-                              ? const Color(0xFF22C55E)
-                              : Colors.transparent,
-                          border: Border.all(
-                            color: isChecked
-                                ? const Color(0xFF22C55E)
-                                : Colors.white.withOpacity(0.2),
-                            width: 2,
-                          ),
-                        ),
-                        child: isChecked
-                            ? const Icon(Icons.check, size: 14, color: Colors.white)
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          tip,
-                          style: TextStyle(
-                            color: isChecked
-                                ? Colors.white.withOpacity(0.4)
-                                : Colors.white.withOpacity(0.8),
-                            fontSize: 14,
-                            height: 1.4,
-                            decoration: isChecked
-                                ? TextDecoration.lineThrough
-                                : null,
-                            decorationColor: Colors.white.withOpacity(0.3),
-                          ),
-                        ),
-                      ),
-                    ],
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: AppColors.tan100,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+              const SizedBox(height: 8),
+              ...checklist.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final tip = (_txPreventionChecklist != null && idx < _txPreventionChecklist!.length)
+                    ? _txPreventionChecklist![idx] : entry.value;
+                final isChecked = _checkedItems.contains(idx);
+
+                return ListTile(
+                  onTap: () => setState(() {
+                    isChecked ? _checkedItems.remove(idx) : _checkedItems.add(idx);
+                  }),
+                  leading: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isChecked ? AppColors.success : Colors.transparent,
+                      border: Border.all(
+                        color: isChecked ? AppColors.success : AppColors.gray300,
+                        width: 2,
+                      ),
+                    ),
+                    child: isChecked 
+                      ? const Icon(Icons.check, size: 14, color: Colors.white)
+                      : const SizedBox(width: 14, height: 14),
+                  ),
+                  title: Text(
+                    tip,
+                    style: TextStyle(
+                      color: isChecked ? AppColors.gray400 : AppColors.gray800,
+                      fontSize: 14,
+                      decoration: isChecked ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ],
     );
   }
+
 
   // ==================== TREATMENT FEEDBACK (US32) ====================
 
@@ -1748,52 +1569,49 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       children: [
         Row(
           children: [
-            const Icon(LucideIcons.messageCircle, size: 18, color: Color(0xFFFBBF24)),
+            const Icon(LucideIcons.thumbsUp, size: 18, color: AppColors.nature600),
             const SizedBox(width: 8),
-            const Text(
-              'Was this helpful?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Help us improve',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppColors.softShadow,
           ),
           child: _feedbackSubmitted
               ? _buildFeedbackConfirmation()
               : Column(
                   children: [
-                    // Thumbs up / down
                     Row(
                       children: [
                         Expanded(
                           child: _buildFeedbackButton(
-                            icon: Icons.thumb_up_rounded,
+                            icon: LucideIcons.thumbsUp,
                             label: 'Helpful',
                             selected: _feedbackRating == 'helpful',
-                            color: const Color(0xFF22C55E),
+                            color: AppColors.success,
                             onTap: () => setState(() {
                               _feedbackRating = 'helpful';
                               _showCommentBox = true;
                             }),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: _buildFeedbackButton(
-                            icon: Icons.thumb_down_rounded,
+                            icon: LucideIcons.thumbsDown,
                             label: 'Not Helpful',
                             selected: _feedbackRating == 'not_helpful',
-                            color: const Color(0xFFEF4444),
+                            color: AppColors.error,
                             onTap: () => setState(() {
                               _feedbackRating = 'not_helpful';
                               _showCommentBox = true;
@@ -1802,64 +1620,37 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                         ),
                       ],
                     ),
-
-                    // Comment box (appears after selecting rating)
                     if (_showCommentBox) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 20),
                       TextField(
                         controller: _commentController,
                         maxLines: 3,
-                        maxLength: 500,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(color: AppColors.gray800, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Add a comment (optional)...',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          hintText: 'Any additional notes...',
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.05),
-                          counterStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          fillColor: AppColors.tan100,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF10B981)),
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
+                        height: 54,
                         child: ElevatedButton(
                           onPressed: _feedbackSubmitting ? null : _submitFeedback,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                            elevation: 0,
                           ),
                           child: _feedbackSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Submit Feedback',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
+                              ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                              : const Text('SUBMIT FEEDBACK', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.1)),
                         ),
                       ),
                     ],
@@ -1869,6 +1660,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       ],
     );
   }
+
 
   Widget _buildFeedbackButton({
     required IconData icon,
@@ -1883,23 +1675,23 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.15) : Colors.white.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(14),
+          color: selected ? color.withOpacity(0.1) : AppColors.background,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? color.withOpacity(0.5) : Colors.white.withOpacity(0.08),
+            color: selected ? color : AppColors.gray200,
             width: selected ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: selected ? color : Colors.white38, size: 28),
-            const SizedBox(height: 6),
+            Icon(icon, color: selected ? color : AppColors.gray400, size: 28),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
-                color: selected ? color : Colors.white54,
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? color : AppColors.gray500,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
               ),
             ),
           ],
@@ -1916,26 +1708,27 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF10B981).withOpacity(0.15),
+            color: AppColors.success.withOpacity(0.1),
           ),
-          child: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 32),
+          child: const Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 32),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         const Text(
-          'Thank you for your feedback!',
+          'Feedback Received!',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Your input helps improve treatment recommendations.',
+        const SizedBox(height: 8),
+        const Text(
+          'Your input helps improve treatment recommendations for everyone.',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 13,
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            height: 1.5,
           ),
         ),
       ],
@@ -1967,16 +1760,26 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   // ==================== FULL REPORT BUTTON ====================
 
   Widget _buildFullReportButton() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 56,
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: _openFullReport,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF10B981),
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
           ),
           elevation: 0,
         ),
@@ -1984,12 +1787,13 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(LucideIcons.fileText, size: 20),
-            SizedBox(width: 10),
+            SizedBox(width: 12),
             Text(
-              'View Full Treatment Report',
+              'VIEW DETAILED ANALYSIS',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
               ),
             ),
           ],

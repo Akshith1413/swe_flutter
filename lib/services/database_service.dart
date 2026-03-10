@@ -60,6 +60,20 @@ class DatabaseService {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // Limit to 20 most recent (US Requirement)
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM diagnosis_history'));
+    if (count != null && count > 20) {
+      // Find the oldest entries to delete
+      await db.execute('''
+        DELETE FROM diagnosis_history 
+        WHERE id IN (
+          SELECT id FROM diagnosis_history 
+          ORDER BY date ASC 
+          LIMIT ?
+        )
+      ''', [count - 20]);
+    }
   }
 
   /// Retrieves all saved diagnoses, sorted by date (newest first).
