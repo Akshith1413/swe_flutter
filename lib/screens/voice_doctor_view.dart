@@ -5,10 +5,11 @@ import '../core/utils/responsive_layout.dart';
 import '../services/audio_service.dart';
 import '../services/chat_service.dart';
 import '../core/localization/translation_service.dart';
+import '../core/theme/app_colors.dart';
 
-/// Voice Doctor View — Premium dark theme with real AI and responsive layout.
+/// Voice Doctor View — Redesigned with AgriTech Light theme.
 ///
-/// US14: Voice input for symptom description with language selection.
+/// US14: Voice input for symptom description.
 /// US16: Confirmation of captured input.
 class VoiceDoctorView extends StatefulWidget {
   final VoidCallback? onBack;
@@ -29,7 +30,6 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
   late AnimationController _pulseController;
 
   String _selectedLocale = 'en_US';
-  List<stt.LocaleName> _availableLocales = [];
 
   final Map<String, String> _localeOptions = {
     'en_US': 'English',
@@ -70,11 +70,9 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
       );
 
       if (available) {
-        final locales = await _speech.locales();
         if (mounted) {
           setState(() {
             _isInitialized = true;
-            _availableLocales = locales;
           });
         }
       }
@@ -124,7 +122,6 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
     setState(() => _isAnalyzing = true);
 
     try {
-      // Use real AI via ChatService
       final aiResponse = await ChatService.getResponse(
         "A farmer describes the following crop symptoms: '$_transcript'. "
         "Provide a brief diagnosis and recommended treatment in 3-4 sentences."
@@ -157,128 +154,167 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1A2E),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: widget.onBack ?? () => Navigator.pop(context),
-          color: Colors.white70,
-        ),
-        title: Text(
-          context.t('voiceView.title'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
+      backgroundColor: AppColors.background,
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
+            colors: [
+              AppColors.primary.withOpacity(0.05),
+              AppColors.background,
+            ],
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: ResponsiveBody(
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  _buildLanguageSelector(),
-                  const SizedBox(height: 40),
-                  _buildMicButton(),
-                  const SizedBox(height: 20),
-                  // Status text
-                  Text(
-                    _isListening
-                        ? context.t('voiceView.listening')
-                        : (_isInitialized ? context.t('voiceView.tapToSpeak') : 'Initializing...'),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _isListening ? const Color(0xFF10B981) : Colors.white54,
-                    ),
-                  ),
-                  if (_isListening)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: _buildWaveformIndicator(),
-                    ),
-                  const SizedBox(height: 36),
-                  if (_transcript.isNotEmpty) _buildTranscriptCard(),
-                  if (_isAnalyzing)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 30),
-                      child: CircularProgressIndicator(color: Color(0xFF10B981)),
-                    )
-                  else if (_response.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildResponseCard(),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _clearAndRetry,
-                        icon: const Icon(LucideIcons.refreshCcw, size: 18),
-                        label: const Text('Ask Again'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF10B981),
-                          side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
+          child: Column(
+            children: [
+              _buildAppBar(),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ResponsiveBody(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          _buildLanguageSelector(),
+                          const SizedBox(height: 60),
+                          _buildMicSection(),
+                          const SizedBox(height: 50),
+                          if (_transcript.isNotEmpty) _buildTranscriptCard(),
+                          if (_isAnalyzing)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 40),
+                              child: Column(
+                                children: [
+                                  const CircularProgressIndicator(
+                                    color: AppColors.primary,
+                                    strokeWidth: 3,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Analyzing your symptoms...',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (_response.isNotEmpty) ...[
+                            const SizedBox(height: 32),
+                            _buildResponseCard(),
+                            const SizedBox(height: 32),
+                            _buildActionButtons(),
+                          ],
+                          const SizedBox(height: 40),
+                        ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 40),
-                ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLanguageSelector() {
+  Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          const Icon(LucideIcons.globe, color: Color(0xFF38BDF8), size: 20),
-          const SizedBox(width: 12),
-          Text('Language:', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14)),
-          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(LucideIcons.chevronLeft, size: 28),
+            onPressed: widget.onBack ?? () => Navigator.pop(context),
+            color: AppColors.textPrimary,
+          ),
           Expanded(
-            child: DropdownButton<String>(
-              value: _selectedLocale,
-              isExpanded: true,
-              underline: const SizedBox(),
-              dropdownColor: const Color(0xFF1E2D45),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              iconEnabledColor: Colors.white54,
-              onChanged: (value) {
-                if (value != null) setState(() => _selectedLocale = value);
-              },
-              items: _localeOptions.entries.map((entry) {
-                return DropdownMenuItem(
-                  value: entry.key,
-                  child: Text(entry.value),
-                );
-              }).toList(),
+            child: Text(
+              context.t('voiceView.title'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary, 
+                fontWeight: FontWeight.w900,
+                fontSize: 22,
+                letterSpacing: -0.5,
+              ),
             ),
+          ),
+          const SizedBox(width: 48), // Balance for leading icon
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: AppColors.softShadow,
+        border: Border.all(color: AppColors.primary.withOpacity(0.05)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(LucideIcons.languages, color: AppColors.primary, size: 18),
+          const SizedBox(width: 12),
+          Text(
+            'Language:', 
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w700)
+          ),
+          const SizedBox(width: 8),
+          DropdownButton<String>(
+            value: _selectedLocale,
+            underline: const SizedBox(),
+            dropdownColor: AppColors.surface,
+            elevation: 8,
+            style: const TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w900),
+            icon: const Icon(LucideIcons.chevronDown, size: 16, color: AppColors.primary),
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedLocale = value);
+            },
+            items: _localeOptions.entries.map((entry) {
+              return DropdownMenuItem(
+                value: entry.key,
+                child: Text(entry.value),
+              );
+            }).toList(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMicSection() {
+    return Column(
+      children: [
+        _buildMicButton(),
+        const SizedBox(height: 32),
+        Text(
+          _isListening
+              ? "Listening to you..."
+              : (_isInitialized ? "Tap to speak symptoms" : "Initializing engine..."),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: _isListening ? AppColors.error : AppColors.textPrimary,
+            letterSpacing: -0.2,
+          ),
+        ),
+        if (_isListening) ...[
+          const SizedBox(height: 16),
+          _buildWaveformIndicator(),
+        ],
+      ],
     );
   }
 
@@ -288,37 +324,60 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
       child: AnimatedBuilder(
         animation: _pulseController,
         builder: (context, child) {
-          final scale = _isListening ? (1.0 + 0.08 * _pulseController.value) : 1.0;
-          final glowRadius = _isListening ? 30.0 + 15.0 * _pulseController.value : 20.0;
-          return Transform.scale(
-            scale: scale,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _isListening
-                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                      : [const Color(0xFF10B981), const Color(0xFF059669)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (_isListening ? const Color(0xFFEF4444) : const Color(0xFF10B981))
-                        .withOpacity(0.35),
-                    blurRadius: glowRadius,
-                    spreadRadius: 2,
+          final scale = _isListening ? (1.0 + 0.15 * _pulseController.value) : 1.0;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_isListening)
+                ...List.generate(3, (i) {
+                  final s = 1.0 + (i + 1) * 0.4 * _pulseController.value;
+                  return Transform.scale(
+                    scale: s,
+                    child: Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.error.withOpacity(0.3 * (1 - _pulseController.value)),
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: _isListening 
+                        ? [AppColors.error, const Color(0xFFF87171)]
+                        : [AppColors.primary, AppColors.nature600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isListening ? AppColors.error : AppColors.primary).withOpacity(0.3),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Center(
+                    child: Icon(
+                      _isListening ? LucideIcons.square : LucideIcons.mic,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-              child: Icon(
-                _isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                size: 52,
-                color: Colors.white,
-              ),
-            ),
+            ],
           );
         },
       ),
@@ -326,76 +385,38 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
   }
 
   Widget _buildWaveformIndicator() {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, _) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(7, (i) {
-            final offset = (i - 3).abs() * 0.15;
-            final height = 8 + 14 * ((_pulseController.value + offset) % 1.0);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(15, (i) {
+        return AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, _) {
+            final offset = (i - 7).abs() * 0.1;
+            final height = 8 + 32 * ((_pulseController.value + offset) % 1.0);
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 2),
               width: 4,
               height: height,
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.6),
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.error.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(10),
               ),
             );
-          }),
+          },
         );
-      },
+      }),
     );
   }
 
   Widget _buildTranscriptCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF818CF8).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(LucideIcons.user, size: 16, color: Color(0xFF818CF8)),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'You said',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF818CF8), fontSize: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _transcript,
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResponseCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppColors.softShadow,
+        border: Border.all(color: AppColors.primary.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,29 +426,124 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView> with SingleTickerProv
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppColors.forest100,
+                  shape: BoxShape.circle,
                 ),
-                child: const Icon(LucideIcons.brain, size: 18, color: Colors.white),
+                child: const Icon(LucideIcons.user, size: 16, color: AppColors.forest600),
               ),
               const SizedBox(width: 12),
-              Text(
-                context.t('voiceView.aiDoctor'),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Color(0xFF10B981),
+              const Text(
+                'YOUR DESCRIPTION',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900, 
+                  color: AppColors.forest600, 
+                  fontSize: 12,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
-            _response,
-            style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.8), height: 1.6),
+            _transcript,
+            style: const TextStyle(
+              fontSize: 16, 
+              color: AppColors.textPrimary, 
+              height: 1.6,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildResponseCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppColors.mediumShadow,
+        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(LucideIcons.sparkles, size: 20, color: AppColors.primary),
+              ),
+              const SizedBox(width: 16),
+              const Text(
+                'AI ASSESSMENT',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  color: AppColors.primary,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _response,
+            style: const TextStyle(
+              fontSize: 17, 
+              color: AppColors.textPrimary, 
+              height: 1.7,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 64,
+          child: ElevatedButton.icon(
+            onPressed: _clearAndRetry,
+            icon: const Icon(LucideIcons.refreshCw, size: 20),
+            label: const Text(
+              'ASK ANOTHER QUESTION', 
+              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 4,
+              shadowColor: AppColors.primary.withOpacity(0.3),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Go back to home',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+

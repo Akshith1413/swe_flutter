@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../services/audio_service.dart';
 
 /// A guide screen that appears before the camera to explain smart features.
-/// 
-/// Equivalent to the "Tutorial Overlay" in React's `EnhancedCompleteCameraCapture`.
+/// Redesigned with AgriTech Light theme.
 class SmartCameraGuideView extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onStart;
@@ -19,18 +19,18 @@ class SmartCameraGuideView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Background Gradient to match React's backdrop blur effect
+          // Background soft gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.8),
-                  AppColors.nature900.withOpacity(0.9),
+                  Color(0xFFE8F5E9),
+                  AppColors.background,
                 ],
               ),
             ),
@@ -41,39 +41,34 @@ class SmartCameraGuideView extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  padding: const EdgeInsets.all(24),
+                  constraints: const BoxConstraints(maxWidth: 450),
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: AppColors.mediumShadow,
+                    border: Border.all(color: AppColors.primary.withOpacity(0.05), width: 1),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
+                      // Header Section
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.nature100,
-                              shape: BoxShape.circle,
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Icon(
-                              Icons.center_focus_strong,
-                              color: AppColors.nature600,
+                              LucideIcons.scan,
+                              color: AppColors.primary,
                               size: 32,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 20),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,16 +76,19 @@ class SmartCameraGuideView extends StatelessWidget {
                                 Text(
                                   context.t('smartCameraGuide.title'),
                                   style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.nature900,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
+                                const SizedBox(height: 4),
                                 Text(
                                   context.t('smartCameraGuide.subtitle'),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 14,
-                                    color: AppColors.gray600,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
@@ -98,86 +96,85 @@ class SmartCameraGuideView extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 36),
 
-                      // Guide Items
+                      // Professional Guide Items
                       _buildGuideItem(
                         context,
-                        icon: Icons.eco,
-                        iconColor: Colors.green,
-                        bgColor: Colors.green.withOpacity(0.1),
+                        icon: LucideIcons.leaf,
+                        iconColor: AppColors.primary,
                         title: context.t('smartCameraGuide.autoLeafDetection'),
                         description: context.t('smartCameraGuide.autoLeafDetectionDesc'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       _buildGuideItem(
                         context,
-                        icon: Icons.speed,
-                        iconColor: Colors.blue,
-                        bgColor: Colors.blue.withOpacity(0.1),
+                        icon: LucideIcons.gauge,
+                        iconColor: AppColors.info,
                         title: context.t('smartCameraGuide.qualityMeter'),
                         description: context.t('smartCameraGuide.qualityMeterDesc'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       _buildGuideItem(
                         context,
-                        icon: Icons.volume_up,
-                        iconColor: Colors.purple,
-                        bgColor: Colors.purple.withOpacity(0.1),
+                        icon: LucideIcons.mic2,
+                        iconColor: AppColors.forest600,
                         title: context.t('smartCameraGuide.voiceGuidance'),
                         description: context.t('smartCameraGuide.voiceGuidanceDesc'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       _buildGuideItem(
                         context,
-                        icon: Icons.warning_amber_rounded,
-                        iconColor: Colors.amber,
-                        bgColor: Colors.amber.withOpacity(0.1),
+                        icon: LucideIcons.alertCircle,
+                        iconColor: AppColors.warning,
                         title: context.t('smartCameraGuide.qualityWarnings'),
                         description: context.t('smartCameraGuide.qualityWarningsDesc'),
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 48),
 
-                      // Action Button
+                      // Primary Action
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: 60,
                         child: ElevatedButton(
                           onPressed: () {
                             audioService.playSound('click');
                             onStart();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.nature600,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(18),
                             ),
-                            elevation: 4,
+                            elevation: 0,
                           ),
                           child: Text(
-                            context.t('smartCameraGuide.startSmartCamera'),
+                            context.t('smartCameraGuide.startSmartCamera').toUpperCase(),
                             style: const TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
                             ),
                           ),
                         ),
                       ),
                       
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       
                       // Cancel Button
                       SizedBox(
                         width: double.infinity,
+                        height: 50,
                         child: TextButton(
                           onPressed: onBack,
                           child: Text(
-                            context.t('common.cancel'),
-                            style: TextStyle(
-                              color: AppColors.gray500,
-                              fontWeight: FontWeight.w600,
+                            context.t('common.cancel').toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
                             ),
                           ),
                         ),
@@ -197,51 +194,52 @@ class SmartCameraGuideView extends StatelessWidget {
     BuildContext context, {
     required IconData icon,
     required Color iconColor,
-    required Color bgColor,
     required String title,
     required String description,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
             icon,
             color: iconColor,
             size: 20,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: iconColor.withOpacity(0.8), // Darker version of icon color for text
-                  ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: iconColor.withOpacity(0.7),
-                    height: 1.4,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                  fontWeight: FontWeight.w400,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
+

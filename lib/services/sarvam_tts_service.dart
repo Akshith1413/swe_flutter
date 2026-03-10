@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:audioplayers/audioplayers.dart';
 
 /// Language configuration for Sarvam TTS + Translation
@@ -202,7 +203,13 @@ class SarvamTTSService {
   // ─── HELPERS ───────────────────────────────────────────────────────────
 
   static Future<void> _playBytes(Uint8List bytes) async {
-    await _player.play(BytesSource(bytes));
+    if (kIsWeb) {
+      final base64String = base64Encode(bytes);
+      final url = 'data:audio/wav;base64,$base64String';
+      await _player.play(UrlSource(url));
+    } else {
+      await _player.play(BytesSource(bytes));
+    }
     await _player.onPlayerComplete.first;
   }
 

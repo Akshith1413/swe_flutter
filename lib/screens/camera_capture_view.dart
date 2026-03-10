@@ -1,19 +1,15 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:image_picker/image_picker.dart';
+import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart' show ImagePicker, ImageSource, XFile;
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
 import '../core/utils/image_quality_util.dart';
 import '../services/audio_service.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
-/// Camera Capture View - Take photos for plant diagnosis.
-/// 
-/// User Stories Covered:
-/// - US9: Capture photos using camera.
-/// - US10: Guidance on taking clear photos (Overlays & Audio).
-/// - US11: Blur or darkness warnings.
-/// - US16: Confirmation of captured input.
+/// Camera Capture View - Modern AI camera for plant diagnosis.
 class CameraCaptureView extends StatefulWidget {
   final VoidCallback onBack;
   final Function(String imagePath, {String? base64Content}) onCapture;
@@ -29,29 +25,50 @@ class CameraCaptureView extends StatefulWidget {
 }
 
 class _CameraCaptureViewState extends State<CameraCaptureView> {
-  final ImagePicker _picker = ImagePicker();
+  CameraController? _controller;
+  List<CameraDescription>? _cameras;
+  bool _isCameraInitialized = false;
   bool _isCapturing = false;
   bool _showGuidance = true;
   String? _qualityWarning;
-  XFile? _capturedImage;
-  String? _base64Image; // Store base64 for web
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    // US10: Play guidance audio on screen load
+    if (!kIsWeb) {
+      _initializeCamera();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       audioService.speak('Position your plant clearly in the frame for best results.');
     });
   }
 
-  /// US9: Captures a photo using the device camera or file picker (on Web).
-  /// 
-  /// performs:
-  /// - Hides guidance overlay.
-  /// - Captures image via `ImagePicker`.
-  /// - US11: Analyzes image quality (blur/darkness check).
-  /// - US16: Plays success audio or error warning.
+  Future<void> _initializeCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        _controller = CameraController(
+          _cameras![0],
+          ResolutionPreset.high,
+          enableAudio: false,
+        );
+        await _controller!.initialize();
+        if (mounted) {
+          setState(() => _isCameraInitialized = true);
+        }
+      }
+    } catch (e) {
+      debugPrint('Camera initialization error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
   Future<void> _capturePhoto() async {
     if (_isCapturing) return;
 
@@ -62,21 +79,20 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     });
 
     try {
-      final XFile? image = await _picker.pickImage(
-        source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
-        imageQuality: 85,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
+      XFile? image;
+      if (_isCameraInitialized && _controller != null) {
+        image = await _controller!.takePicture();
+      } else {
+        // Fallback to gallery
+        image = await _picker.pickImage(source: ImageSource.gallery);
+      }
 
       if (image == null) {
         setState(() => _isCapturing = false);
         return;
       }
 
-      // US11: Check image quality & Prepare for Web/Offline
       final bytes = await image.readAsBytes();
-      
       final quality = await ImageQualityUtil.analyzeImageFromBytes(bytes);
 
       if (!mounted) return;
@@ -87,47 +103,35 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
           _qualityWarning = quality.isBlurry
               ? 'Image appears blurry. Please take another photo.'
               : 'Image is too dark. Try adding more light.';
-          _capturedImage = image;
         });
-        // US11: Audio warning
         audioService.confirmAction('error', message: _qualityWarning);
         return;
       }
 
-      // US16: Success confirmation
-      setState(() {
-        _isCapturing = false;
-        _capturedImage = image;
-      });
-      
+      setState(() => _isCapturing = false);
       audioService.confirmAction('success', message: 'Photo captured successfully!');
-      
       _showSuccessAndProceed(image.path, bytes: bytes);
 
     } catch (e) {
       debugPrint('Error capturing photo: $e');
       setState(() => _isCapturing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
     }
   }
 
-  /// US16: Shows a success snackbar and proceeds to the next step.
-  /// 
-  /// Handles passing base64 content for Web support.
+  Future<void> _pickFromGallery() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      _showSuccessAndProceed(image.path, bytes: bytes);
+    }
+  }
+
   void _showSuccessAndProceed(String path, {Uint8List? bytes}) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: const [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Photo captured successfully!'),
-          ],
-        ),
-        backgroundColor: AppColors.nature600,
-        duration: const Duration(seconds: 2),
+        content: const Text('Photo captured successfully!'),
+        backgroundColor: AppColors.primary,
+        duration: const Duration(seconds: 1),
       ),
     );
 
@@ -136,327 +140,251 @@ class _CameraCaptureViewState extends State<CameraCaptureView> {
     });
   }
 
-  /// Retries capture after a quality warning.
-  void _retryCapture() {
-    setState(() {
-      _qualityWarning = null;
-      _capturedImage = null;
-    });
-    _capturePhoto();
-  }
-
-  /// Proceeds with the captured image despite quality warnings.
-  void _proceedAnyway() async {
-    if (_capturedImage != null) {
-      String? base64String;
-      if (kIsWeb) {
-        final bytes = await _capturedImage!.readAsBytes();
-        base64String = Uri.dataFromBytes(bytes, mimeType: 'image/jpeg').toString().split(',').last;
-      }
-      widget.onCapture(_capturedImage!.path, base64Content: base64String);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.nature50,
+      backgroundColor: Colors.black, // Darker background for camera focus
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.nature700),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
           onPressed: widget.onBack,
         ),
         title: Text(
           context.t('cameraView.title'),
-          style: const TextStyle(color: AppColors.nature800),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.image, color: Colors.white),
+            onPressed: _pickFromGallery,
+            tooltip: 'Choose from gallery',
+          ),
+        ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.nature50, Color(0xFFD1FAE5)],
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // 1. Camera Preview or Fallback
+          Positioned.fill(
+            child: _isCameraInitialized && _controller != null
+                ? CameraPreview(_controller!)
+                : Container(
+                    color: AppColors.gray900,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(LucideIcons.cameraOff, color: Colors.white54, size: 48),
+                          const SizedBox(height: 16),
+                          Text(
+                            kIsWeb ? "Web mode: Use gallery upload" : "Initializing camera...",
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          if (kIsWeb) ...[
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: _pickFromGallery,
+                              icon: const Icon(LucideIcons.image),
+                              label: const Text("Select from Gallery"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                              ),
+                            )
+                          ]
+                        ],
+                      ),
+                    ),
+                  ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // US10: Pre-capture guidance
-              if (_showGuidance) _buildGuidanceSection(),
 
-              // Main capture area
-              Expanded(
-                child: _buildCaptureArea(),
+          // 2. Alignment Overlay
+          if (_isCameraInitialized) _buildCameraOverlay(),
+
+          // 3. Guidance Section
+          if (_showGuidance) 
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 60,
+              left: 20,
+              right: 20,
+              child: _buildGuidanceSection(),
+            ),
+
+          // 4. Capture Controls
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildBottomControls(),
+          ),
+
+          if (_isCapturing)
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraOverlay() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.35),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 280,
+              height: 380,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.transparent),
               ),
-
-              // US11: Quality warning overlay
-              if (_qualityWarning != null) _buildQualityWarning(),
-
-              // Bottom controls
-              _buildBottomControls(),
-            ],
-          ),
+              child: Stack(
+                children: [
+                  _buildCorner(Alignment.topLeft),
+                  _buildCorner(Alignment.topRight),
+                  _buildCorner(Alignment.bottomLeft),
+                  _buildCorner(Alignment.bottomRight),
+                  const Center(
+                    child: Icon(LucideIcons.scan, color: Colors.white38, size: 40),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                "Align leaf within frame",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// US10: Displays guidance tips for taking clear photos.
+  Widget _buildCorner(Alignment alignment) {
+    return Align(
+      alignment: alignment,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          border: Border(
+            top: alignment == Alignment.topLeft || alignment == Alignment.topRight 
+              ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+            bottom: alignment == Alignment.bottomLeft || alignment == Alignment.bottomRight 
+              ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+            left: alignment == Alignment.topLeft || alignment == Alignment.bottomLeft 
+              ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+            right: alignment == Alignment.topRight || alignment == Alignment.bottomRight 
+              ? const BorderSide(color: Colors.white, width: 4) : BorderSide.none,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGuidanceSection() {
     return Container(
-      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.blue50,
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.blue200),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.lightbulb_outline, color: AppColors.blue600),
+              const Icon(LucideIcons.sparkles, color: AppColors.primary, size: 18),
               const SizedBox(width: 8),
-              Text(
-                context.t('cameraView.tips'),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.blue700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildTipItem(Icons.wb_sunny, 'Ensure good lighting'),
-          _buildTipItem(Icons.center_focus_strong, 'Focus on affected area'),
-          _buildTipItem(Icons.zoom_in, 'Get close to the plant'),
-          _buildTipItem(Icons.pan_tool, 'Hold device steady'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTipItem(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.blue500),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(color: AppColors.blue600)),
-        ],
-      ),
-    );
-  }
-
-  /// Builds the main camera preview area with frame guides.
-  Widget _buildCaptureArea() {
-    return Center(
-      child: Container(
-        width: 300,
-        height: 300,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: AppColors.nature300,
-            width: 3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Frame guide corners (US10)
-            ..._buildFrameGuideCorners(),
-            
-            // Center content
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _isCapturing ? Icons.hourglass_empty : Icons.camera_alt,
-                    size: 64,
-                    color: AppColors.nature400,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _isCapturing 
-                        ? 'Processing...' 
-                        : context.t('cameraView.alignPlant'),
-                    style: TextStyle(
-                      color: AppColors.gray600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds the corner indicators for the camera frame guide.
-  List<Widget> _buildFrameGuideCorners() {
-    const cornerSize = 30.0;
-    const cornerWidth = 4.0;
-    const color = AppColors.nature500;
-
-    return [
-      // Top-left
-      Positioned(
-        top: 0, left: 0,
-        child: Container(
-          width: cornerSize, height: cornerSize,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: color, width: cornerWidth),
-              left: BorderSide(color: color, width: cornerWidth),
-            ),
-          ),
-        ),
-      ),
-      // Top-right
-      Positioned(
-        top: 0, right: 0,
-        child: Container(
-          width: cornerSize, height: cornerSize,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: color, width: cornerWidth),
-              right: BorderSide(color: color, width: cornerWidth),
-            ),
-          ),
-        ),
-      ),
-      // Bottom-left
-      Positioned(
-        bottom: 0, left: 0,
-        child: Container(
-          width: cornerSize, height: cornerSize,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: color, width: cornerWidth),
-              left: BorderSide(color: color, width: cornerWidth),
-            ),
-          ),
-        ),
-      ),
-      // Bottom-right
-      Positioned(
-        bottom: 0, right: 0,
-        child: Container(
-          width: cornerSize, height: cornerSize,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: color, width: cornerWidth),
-              right: BorderSide(color: color, width: cornerWidth),
-            ),
-          ),
-        ),
-      ),
-    ];
-  }
-
-  /// US11: Displays quality warning with options to Retry or Use Anyway.
-  Widget _buildQualityWarning() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.amber50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.amber300),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: AppColors.amber600),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _qualityWarning!,
-                  style: TextStyle(color: AppColors.amber800, fontWeight: FontWeight.w500),
-                ),
+              const Text("Capture Tips", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() => _showGuidance = false),
+                child: const Icon(Icons.close, size: 16, color: Colors.black45),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _retryCapture,
-                  child: const Text('Retry'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _proceedAnyway,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.amber600,
-                  ),
-                  child: const Text('Use Anyway'),
-                ),
-              ),
+              _buildSimpleTip(LucideIcons.sun, "Bright Light"),
+              _buildSimpleTip(LucideIcons.focus, "Clear Focus"),
+              _buildSimpleTip(LucideIcons.maximize, "Fill Frame"),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSimpleTip(IconData icon, String text) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: AppColors.primary),
+        const SizedBox(height: 4),
+        Text(text, style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
   Widget _buildBottomControls() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 30),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black87, Colors.transparent],
+        ),
+      ),
       child: Column(
         children: [
-          // Main capture button
           GestureDetector(
             onTap: _isCapturing ? null : _capturePhoto,
             child: Container(
-              width: 80,
-              height: 80,
+              width: 84,
+              height: 84,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _isCapturing ? AppColors.gray300 : AppColors.nature600,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.nature600.withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                border: Border.all(color: Colors.white, width: 4),
               ),
               child: Center(
-                child: _isCapturing
-                    ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
-                    : const Icon(Icons.camera_alt, size: 36, color: Colors.white),
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(LucideIcons.camera, color: Colors.black, size: 32),
+                ),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            kIsWeb ? 'Tap to select photo' : 'Tap to capture',
-            style: TextStyle(color: AppColors.gray600),
+          const Text(
+            "TAP TO SCAN",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1.5, fontSize: 12),
           ),
         ],
       ),
     );
   }
 }
+

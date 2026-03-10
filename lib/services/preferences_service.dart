@@ -133,6 +133,12 @@ class PreferencesService {
     final history = await _getHistoryList();
     // Add new result at the beginning
     history.insert(0, json.encode(resultJson));
+    
+    // Limit to 20 most recent entries
+    if (history.length > 20) {
+      history.removeRange(20, history.length);
+    }
+    
     await p.setStringList(_historyKey, history);
   }
 

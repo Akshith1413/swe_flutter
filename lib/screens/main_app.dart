@@ -22,6 +22,8 @@ import 'video_recorder_view.dart';
 import 'llm_advice_view.dart';
 import 'smart_camera_guide_view.dart';
 import 'diagnosis_result_screen.dart';
+import 'chatbot_view.dart';
+import 'farmer_calendar_screen.dart';
 import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
@@ -239,8 +241,21 @@ class _MainAppState extends State<MainApp> {
   }
 
   Widget _buildMainApp() {
-    return Scaffold(
-      body: _buildCurrentView(),
+    // If we are in a full-screen sub-flow (camera, upload, etc), show it without bottom nav
+    final fullScreenViews = {
+      'camera', 'upload', 'voice', 'video', 'history',
+      'profile', 'settings', 'audio-settings', 'llm-advice',
+      'smart-camera-guide',
+    };
+
+    if (fullScreenViews.contains(_currentView)) {
+      return Scaffold(body: _buildCurrentView());
+    }
+
+    return _MainScaffold(
+      currentView: _currentView,
+      onNavigate: _navigateTo,
+      buildCurrentView: _buildCurrentView,
     );
   }
 
@@ -491,6 +506,22 @@ class _MainAppState extends State<MainApp> {
         return LlmAdviceView(
           onBack: () => _navigateTo('home'),
         );
+      case 'chatbot':
+        return ChatbotView(
+          onClose: () => _navigateTo('home'),
+        );
+      case 'farmer-calendar':
+        return FarmerCalendarScreen(
+          onBack: () => _navigateTo('home'),
+        );
+      case 'auth':
+        return LoginScreen(
+          onLogin: () {
+            setState(() => _appState = 'app');
+            _navigateTo('home');
+          },
+          onSkip: () => _navigateTo('home'),
+        );
       default:
         return HomeView(
           onNavigate: _navigateTo,
@@ -663,3 +694,141 @@ class _MainAppState extends State<MainApp> {
 }
 
 // Unit 64 by bhuvi-d
+
+// =====================================================
+// 5-TAB BOTTOM NAVIGATION SCAFFOLD
+// =====================================================
+
+class _MainScaffold extends StatefulWidget {
+  final String currentView;
+  final void Function(String) onNavigate;
+  final Widget Function() buildCurrentView;
+
+  const _MainScaffold({
+    required this.currentView,
+    required this.onNavigate,
+    required this.buildCurrentView,
+  });
+
+  @override
+  State<_MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends State<_MainScaffold>
+    with SingleTickerProviderStateMixin {
+  int _selectedIndex = 0;
+  late AnimationController _micPulse;
+
+  // Left tabs (left of the Voice FAB)
+  static const _leftTabs = [
+    _TabDef(label: 'Home', icon: Icons.home_rounded,       view: 'home'),
+    _TabDef(label: 'Scan', icon: Icons.camera_alt_rounded, view: 'smart-camera-guide'),
+  ];
+
+  // Right tabs (right of the Voice FAB)
+  static const _rightTabs = [
+    _TabDef(label: 'History', icon: Icons.history_rounded,     view: 'history'),
+    _TabDef(label: 'Chatbot', icon: Icons.chat_bubble_rounded, view: 'chatbot'),
+    _TabDef(label: 'Profile', icon: Icons.person_rounded,      view: 'profile'),
+  ];
+
+  // All tabs combined (for index tracking)
+  static const _allTabs = [..._leftTabs, ..._rightTabs];
+
+  @override
+  void initState() {
+    super.initState();
+    _micPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _micPulse.dispose();
+    super.dispose();
+  }
+
+  void _onTabTapped(int index) {
+    if (index == _selectedIndex && index == 0) return;
+    setState(() => _selectedIndex = index);
+    widget.onNavigate(_allTabs[index].view);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: widget.buildCurrentView(),
+      // ─── Bottom navigation bar ──────────────────────────────────────────
+      bottomNavigationBar: BottomAppBar(
+        color: Colors.white,
+        elevation: 12,
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: [
+              // Left tabs
+              ..._leftTabs.asMap().entries.map((e) {
+                final i = e.key;
+                final tab = e.value;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => _onTabTapped(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: _buildTabItem(tab, _selectedIndex == i),
+                  ),
+                );
+              }),
+
+              // Center space for FAB notch
+              const SizedBox(width: 70),
+
+              // Right tabs (index offset by _leftTabs.length)
+              ..._rightTabs.asMap().entries.map((e) {
+                final i = e.key + _leftTabs.length;
+                final tab = e.value;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => _onTabTapped(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: _buildTabItem(tab, _selectedIndex == i),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabItem(_TabDef tab, bool selected) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          tab.icon,
+          size: 22,
+          color: selected ? const Color(0xFF2E7D32) : const Color(0xFF9E9E9E),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          tab.label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? const Color(0xFF2E7D32) : const Color(0xFF9E9E9E),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TabDef {
+  final String label;
+  final IconData icon;
+  final String view;
+  const _TabDef({required this.label, required this.icon, required this.view});
+}

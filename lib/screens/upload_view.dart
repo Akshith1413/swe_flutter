@@ -2,14 +2,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../core/theme/app_colors.dart';
 import '../core/utils/responsive_layout.dart';
 import '../core/localization/translation_service.dart';
 import '../services/audio_service.dart';
 
-/// Upload View — Premium dark theme with responsive grid.
-///
-/// US12: Upload multiple images with thumbnail carousel.
-/// US16: Confirmation of uploaded/selected media.
+/// Upload View — Modern AgriTech theme for image selection.
 class UploadView extends StatefulWidget {
   final Function(List<String>) onImagesSelected;
   final VoidCallback onBack;
@@ -66,7 +64,7 @@ class _UploadViewState extends State<UploadView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${_selectedImages.length} image(s) sent for analysis'),
-          backgroundColor: const Color(0xFF10B981),
+          backgroundColor: AppColors.primary,
         ),
       );
       setState(() => _isLoading = false);
@@ -76,57 +74,65 @@ class _UploadViewState extends State<UploadView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: widget.onBack,
-          color: Colors.white70,
+          color: AppColors.gray800,
         ),
         title: Text(
           context.t('uploadView.title'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.gray800,
+          ),
         ),
         centerTitle: true,
       ),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F1A2E), Color(0xFF1A2940)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: ResponsiveBody(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        // Drop Zone
-                        GestureDetector(
-                          onTap: _selectImages,
-                          child: _selectedImages.isEmpty
-                              ? _buildEmptyState()
-                              : _buildImageGrid(context),
-                        ),
-                      ],
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: responsiveMaxWidth(context)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Upload Crop Photos",
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.gray800,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Select clear photos of the affected leaves for more accurate AI diagnosis.",
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Main Drop Zone / Selection Area
+                    GestureDetector(
+                      onTap: _selectImages,
+                      child: _selectedImages.isEmpty
+                          ? _buildEmptyState()
+                          : _buildImageGrid(context),
+                    ),
+                  ],
                 ),
               ),
-              // Bottom Action Bar
-              _buildBottomBar(context),
-            ],
+            ),
           ),
-        ),
+          // Bottom Action Bar
+          _buildBottomBar(context),
+        ],
       ),
     );
   }
@@ -134,12 +140,14 @@ class _UploadViewState extends State<UploadView> {
   Widget _buildEmptyState() {
     return Container(
       height: 320,
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: AppColors.leaf50,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: const Color(0xFF10B981).withOpacity(0.3),
+          color: AppColors.primary.withOpacity(0.2),
           width: 2,
+          style: BorderStyle.solid,
         ),
       ),
       child: Center(
@@ -150,35 +158,36 @@ class _UploadViewState extends State<UploadView> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
+                color: Colors.white,
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF10B981).withOpacity(0.2),
-                    const Color(0xFF10B981).withOpacity(0.05),
-                  ],
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: const Icon(
                 LucideIcons.imagePlus,
-                size: 36,
-                color: Color(0xFF10B981),
+                size: 32,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Tap to select images',
-              style: TextStyle(
-                fontSize: 18,
+            const SizedBox(height: 24),
+            Text(
+              'Select Images',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.gray800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Select one or more crop leaf images for analysis',
+              'Select one or more crop leaf images',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.5),
+                color: AppColors.gray500,
               ),
             ),
           ],
@@ -194,20 +203,25 @@ class _UploadViewState extends State<UploadView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(LucideIcons.image, size: 18, color: const Color(0xFF10B981)),
-            const SizedBox(width: 8),
             Text(
-              '${_selectedImages.length} image(s) selected',
+              'Selected Photos (${_selectedImages.length})',
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+                color: AppColors.gray800,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
+            ),
+            TextButton.icon(
+              onPressed: _selectImages,
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: const Text("Add More"),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -217,42 +231,14 @@ class _UploadViewState extends State<UploadView> {
             mainAxisSpacing: 12,
             childAspectRatio: 1,
           ),
-          itemCount: _selectedImages.length + 1, // +1 for add button
+          itemCount: _selectedImages.length,
           itemBuilder: (context, index) {
-            if (index == _selectedImages.length) {
-              // Add more button
-              return GestureDetector(
-                onTap: _selectImages,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(LucideIcons.plus, color: Colors.white.withOpacity(0.4), size: 28),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Add More',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
             return Stack(
               children: [
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    boxShadow: AppColors.smallShadow,
                     image: DecorationImage(
                       image: MemoryImage(_imageBytes[index]),
                       fit: BoxFit.cover,
@@ -261,34 +247,19 @@ class _UploadViewState extends State<UploadView> {
                 ),
                 // Remove button
                 Positioned(
-                  top: 6,
-                  right: 6,
+                  top: 8,
+                  right: 8,
                   child: GestureDetector(
                     onTap: () => _removeImage(index),
                     child: Container(
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.white,
                         shape: BoxShape.circle,
+                        boxShadow: AppColors.smallShadow,
                       ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
-                    ),
-                  ),
-                ),
-                // Index badge
-                Positioned(
-                  bottom: 6,
-                  left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      child: const Icon(Icons.close, size: 16, color: AppColors.error),
                     ),
                   ),
                 ),
@@ -302,13 +273,16 @@ class _UploadViewState extends State<UploadView> {
 
   Widget _buildBottomBar(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        left: 16, right: 16, top: 14,
-        bottom: MediaQuery.of(context).padding.bottom + 14,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Center(
         child: ConstrainedBox(
@@ -316,38 +290,44 @@ class _UploadViewState extends State<UploadView> {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _selectImages,
-                  icon: const Icon(LucideIcons.imagePlus, size: 18),
-                  label: Text(context.t('uploadView.addMore')),
+                child: OutlinedButton(
+                  onPressed: _isLoading ? null : () => setState(() { _selectedImages.clear(); _imageBytes.clear(); }),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.4)),
-                    foregroundColor: const Color(0xFF10B981),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: AppColors.gray200),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
+                  child: const Text("Clear All", style: TextStyle(color: AppColors.gray600)),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _selectedImages.isEmpty || _isLoading ? null : _uploadImages,
-                  icon: _isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(LucideIcons.scan, size: 18),
-                  label: Text(
-                    _selectedImages.isEmpty
-                        ? context.t('uploadView.selectImages')
-                        : '${context.t('uploadView.analyze')} ${_selectedImages.length}',
-                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    disabledBackgroundColor: Colors.white.withOpacity(0.06),
+                    disabledBackgroundColor: AppColors.gray200,
                   ),
+                  child: _isLoading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(LucideIcons.sparkles, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              _selectedImages.isEmpty
+                                  ? "Select Images"
+                                  : "Start AI Analysis (${_selectedImages.length})",
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ],
@@ -357,3 +337,4 @@ class _UploadViewState extends State<UploadView> {
     );
   }
 }
+

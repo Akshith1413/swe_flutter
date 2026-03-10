@@ -15,7 +15,7 @@ import '../services/explanation_service.dart';
 import 'treatment_steps_widget.dart';
 
 /// A sophisticated advice card matching the React application's high-end UI.
-/// Replicates the 'ImageAnalysis' component with a dark, premium aesthetic.
+/// Redesigned with AgriTech Premium Light theme.
 class CropAdviceCard extends StatefulWidget {
   final AnalysisResult result;
   final VoidCallback onClose;
@@ -40,8 +40,8 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
   String? _regionAdvice;
   String? _translatedRegionAdvice;
   Map<String, dynamic>? _structuredTreatments;
-  bool _showOrganic = true; // Controls the Organic/Chemical tab switcher
-  bool _showHeatmapOverlay = false; // Controls heatmap display in report
+  bool _showOrganic = true;
+  bool _showHeatmapOverlay = false;
 
   @override
   void initState() {
@@ -64,7 +64,6 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
       _translatedChemicalSteps = await _translateList(widget.result.chemicalSteps);
     }
 
-    // Fetch Current Region for localized advice and dosage
     final region = await preferencesService.getRegion() ?? 'Tamil Nadu';
     _regionAdvice = await RegionService.getRegionAdvice(region, widget.result.disease);
     
@@ -72,7 +71,6 @@ class _CropAdviceCardState extends State<CropAdviceCard> {
       _translatedRegionAdvice = await TranslationService.translate(_regionAdvice!, _targetLanguage);
     }
 
-    // Fetch Structured Dosage Treatments
     _structuredTreatments = await TreatmentService.getTreatment(
       widget.result.disease,
       region: region,
@@ -110,15 +108,17 @@ Analysis: ${widget.result.cause}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // React-matching dark background
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          // 1. Large Image Header with Gradient
+          // 1. Image Header
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 320,
             pinned: true,
             automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF0F172A),
+            backgroundColor: AppColors.background,
+            elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -131,9 +131,9 @@ Analysis: ${widget.result.cause}
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Color(0xFF0F172A),
+                          AppColors.background,
                         ],
-                        stops: [0.6, 1.0],
+                        stops: [0.5, 1.0],
                       ),
                     ),
                   ),
@@ -144,21 +144,30 @@ Analysis: ${widget.result.cause}
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.result.crop,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            widget.result.crop.toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 8),
                         Text(
                           widget.result.disease,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
                           ),
                         ),
                       ],
@@ -168,11 +177,15 @@ Analysis: ${widget.result.cause}
               ),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: widget.onClose,
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black26,
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: IconButton(
+                  icon: const Icon(LucideIcons.x, color: AppColors.textPrimary),
+                  onPressed: widget.onClose,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white70,
+                    elevation: 4,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -186,15 +199,15 @@ Analysis: ${widget.result.cause}
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Confidence & Severity Row
+                  // Metrics Row
                   Row(
                     children: [
                       Expanded(
                         child: _buildMetricCard(
                           'Confidence',
                           '${(widget.result.confidence * 100).toInt()}%',
-                          Icons.radar,
-                          color: const Color(0xFF10B981),
+                          LucideIcons.target,
+                          color: AppColors.success,
                           progress: widget.result.confidence,
                         ),
                       ),
@@ -202,119 +215,95 @@ Analysis: ${widget.result.cause}
                       Expanded(
                         child: _buildMetricCard(
                           'Severity',
-                          widget.result.severity,
-                          Icons.error_outline,
+                          widget.result.severity.toUpperCase(),
+                          LucideIcons.alertTriangle,
                           color: _getSeverityColor(widget.result.severity),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // Heatmap Viewer (US20)
+                  // Heatmap (if available)
                   if (widget.result.heatmapBase64 != null) ...[
-                    _buildSectionTitle(Icons.layers, 'Affected Areas', Colors.redAccent),
+                    _buildSectionTitle(LucideIcons.layers, 'AFFECTED AREAS', Colors.redAccent),
                     _buildHeatmapViewer(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                   ],
 
-                  // Top Predictions (US18)
-                  if (widget.result.topPredictions.isNotEmpty) ...[
-                    _buildSectionTitle(Icons.bar_chart, 'Alternative Predictions', const Color(0xFF818CF8)),
-                    _buildTopPredictionsSection(),
-                    const SizedBox(height: 24),
-                  ],
-
-                   const SizedBox(height: 24),
- 
-                   // Simple Explanation (US23)
-                   _buildSectionTitle(LucideIcons.messageCircle, 'Simple Explanation', Colors.orangeAccent),
-                   _buildGlassInfoCard(
-                     ExplanationService.getSimpleExplanation(widget.result.disease),
-                     icon: LucideIcons.messageCircle,
-                     iconColor: Colors.orangeAccent,
-                   ),
-
-                   const SizedBox(height: 24),
-
-                   // AI Insight Section (Quick Tip)
-                  _buildSectionTitle(LucideIcons.sparkles, 'AI Insight', Colors.purpleAccent),
+                  // AI Insight Section
+                  _buildSectionTitle(LucideIcons.sparkles, 'AI INSIGHT & CAUSE', AppColors.primary),
                   _buildGlassInfoCard(
                     widget.result.cause,
-                    icon: Icons.lightbulb_outline,
-                    iconColor: Colors.amberAccent,
+                    icon: LucideIcons.lightbulb,
+                    iconColor: Colors.amber,
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // Symptoms Section
-                  _buildSectionTitle(LucideIcons.list, 'Detected Symptoms', Colors.blueAccent),
+                  // Symptoms
+                  _buildSectionTitle(LucideIcons.list, 'DETECTED SYMPTOMS', AppColors.info),
                   _buildSymptomsTags(),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
                   // Treatment Section
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSectionTitle(LucideIcons.checkCircle, 'Recommended Actions', const Color(0xFF10B981)),
-                      TextButton.icon(
+                      _buildSectionTitle(LucideIcons.shieldCheck, 'RECOMMENDED ACTIONS', AppColors.success),
+                      IconButton(
                         onPressed: _isTranslating ? null : () {
                           TTSService.speakSteps(_translatedSteps, _targetLanguage);
                         },
                         icon: Icon(
-                          _isTranslating ? Icons.hourglass_empty : Icons.volume_up, 
+                          _isTranslating ? LucideIcons.loader : LucideIcons.volume2, 
                           size: 20, 
-                          color: const Color(0xFF10B981)
+                          color: AppColors.primary
                         ),
-                        label: Text(
-                          _isTranslating ? 'Translating...' : 'Play Instructions',
-                          style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.primary.withOpacity(0.1),
+                          padding: const EdgeInsets.all(10),
                         ),
                       ),
                     ],
                   ),
-                   _buildTreatmentList(),
+                  _buildTreatmentList(),
 
-                  const SizedBox(height: 24),
-
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
                   // Treatment Tabs (Organic vs Chemical)
                   Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: AppColors.softShadow,
                     ),
                     child: Row(
                       children: [
                         Expanded(
                           child: GestureDetector(
                             onTap: () => setState(() => _showOrganic = true),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
-                                color: _showOrganic ? const Color(0xFF10B981).withOpacity(0.2) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                                border: _showOrganic ? Border.all(color: const Color(0xFF10B981).withOpacity(0.5)) : null,
+                                color: _showOrganic ? AppColors.primary : Colors.transparent,
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.eco, size: 18, color: _showOrganic ? const Color(0xFF10B981) : Colors.white54),
-                                  const SizedBox(width: 8),
+                                  Icon(LucideIcons.leaf, size: 18, color: _showOrganic ? Colors.white : AppColors.textHint),
+                                  const SizedBox(width: 10),
                                   Text(
                                     'Organic',
                                     style: TextStyle(
-                                      color: _showOrganic ? const Color(0xFF10B981) : Colors.white54,
-                                      fontWeight: _showOrganic ? FontWeight.bold : FontWeight.normal,
+                                      color: _showOrganic ? Colors.white : AppColors.textHint,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ],
@@ -325,23 +314,24 @@ Analysis: ${widget.result.cause}
                         Expanded(
                           child: GestureDetector(
                             onTap: () => setState(() => _showOrganic = false),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
-                                color: !_showOrganic ? Colors.orangeAccent.withOpacity(0.2) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                                border: !_showOrganic ? Border.all(color: Colors.orangeAccent.withOpacity(0.5)) : null,
+                                color: !_showOrganic ? const Color(0xFFF59E0B) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.science, size: 18, color: !_showOrganic ? Colors.orangeAccent : Colors.white54),
-                                  const SizedBox(width: 8),
+                                  Icon(LucideIcons.flaskConical, size: 18, color: !_showOrganic ? Colors.white : AppColors.textHint),
+                                  const SizedBox(width: 10),
                                   Text(
                                     'Chemical',
                                     style: TextStyle(
-                                      color: !_showOrganic ? Colors.orangeAccent : Colors.white54,
-                                      fontWeight: !_showOrganic ? FontWeight.bold : FontWeight.normal,
+                                      color: !_showOrganic ? Colors.white : AppColors.textHint,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ],
@@ -352,9 +342,8 @@ Analysis: ${widget.result.cause}
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   
-                  // Active Treatment Content
                   if (_showOrganic)
                     _buildStepsList(
                       _translatedOrganicSteps.isEmpty ? widget.result.organicSteps : _translatedOrganicSteps,
@@ -366,135 +355,62 @@ Analysis: ${widget.result.cause}
                       type: 'chemical',
                     ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // US30: Recovery Timeline Section
+                  // Recovery Timeline
                   if (widget.result.recoveryTimeline.isNotEmpty) ...[
-                    _buildSectionTitle(Icons.timeline, 'Recovery Timeline', const Color(0xFF38BDF8)),
+                    _buildSectionTitle(LucideIcons.calendar, 'RECOVERY TIMELINE', AppColors.info),
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: AppColors.softShadow,
                       ),
                       child: Column(
                         children: [
                           _buildTimelineRow(
                             'Initial Improvement',
                             '${widget.result.recoveryTimeline['initialDays'] ?? '3-5'} days',
-                            Icons.trending_up,
-                            const Color(0xFF38BDF8),
+                            LucideIcons.trendingUp,
+                            AppColors.info,
                           ),
-                          const SizedBox(height: 12),
+                          const Divider(height: 32, thickness: 0.5),
                           _buildTimelineRow(
                             'Full Recovery',
                             '${widget.result.recoveryTimeline['fullRecoveryDays'] ?? '14-21'} days',
-                            Icons.favorite,
-                            const Color(0xFF10B981),
+                            LucideIcons.heart,
+                            AppColors.success,
                           ),
-                          const SizedBox(height: 12),
+                          const Divider(height: 32, thickness: 0.5),
                           _buildTimelineRow(
                             'Monitoring Period',
                             '${widget.result.recoveryTimeline['monitoringDays'] ?? '30'} days',
-                            Icons.visibility,
-                            const Color(0xFF818CF8),
+                            LucideIcons.eye,
+                            AppColors.primary,
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // US31: Prevention Checklist Section
-                  if (widget.result.preventionChecklist.isNotEmpty) ...[
-                    _buildSectionTitle(Icons.shield_outlined, 'Prevention Tips', const Color(0xFF22C55E)),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      ),
-                      child: Column(
-                        children: widget.result.preventionChecklist.asMap().entries.map((entry) {
-                          final idx = entry.key;
-                          final tip = entry.value;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              border: idx < widget.result.preventionChecklist.length - 1
-                                  ? Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05)))
-                                  : null,
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  margin: const EdgeInsets.only(top: 1),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: const Color(0xFF22C55E).withOpacity(0.15),
-                                    border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.4)),
-                                  ),
-                                  child: const Icon(Icons.check, size: 12, color: Color(0xFF22C55E)),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    tip,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 14,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Regional Advice Section
-                  if (_regionAdvice != null) ...[
-                    _buildSectionTitle(Icons.map_outlined, 'Regional Advice', Colors.cyanAccent),
-                    GestureDetector(
-                      onTap: () {
-                        TTSService.speakText(_translatedRegionAdvice ?? _regionAdvice!, _targetLanguage);
-                      },
-                      child: _buildGlassInfoCard(
-                        _translatedRegionAdvice ?? _regionAdvice!,
-                        icon: Icons.info_outline,
-                        iconColor: Colors.cyanAccent,
                       ),
                     ),
                     const SizedBox(height: 32),
                   ],
 
-                  // Bottom Action
+                  // Share/Copy Report
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
+                    height: 56,
+                    child: OutlinedButton.icon(
                       onPressed: _handleCopy,
-                      icon: Icon(_copied ? Icons.check : Icons.copy, size: 18),
-                      label: Text(_copied ? 'Copied to Clipboard' : 'Share Report'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.1),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                        ),
+                      icon: Icon(_copied ? LucideIcons.check : LucideIcons.share2, size: 18),
+                      label: Text(_copied ? 'COPIED!' : 'SHARE ANALYSIS REPORT'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary, width: 2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 60),
                 ],
               ),
             ),
@@ -515,49 +431,48 @@ Analysis: ${widget.result.cause}
     if (!kIsWeb && file.existsSync()) {
       return Image.file(file, fit: BoxFit.cover);
     }
-    
-    // Fallback if image not found (local history item with expired temp path)
     return Container(
-      color: Colors.grey[900],
+      color: AppColors.background,
       child: const Center(
-        child: Icon(Icons.eco, size: 80, color: Colors.white10),
+        child: Icon(LucideIcons.leaf, size: 80, color: AppColors.textHint),
       ),
     );
   }
 
   Widget _buildMetricCard(String title, String value, IconData icon, {required Color color, double? progress}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppColors.softShadow,
+        border: Border.all(color: color.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: Colors.white54),
-              const SizedBox(width: 6),
-              Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w700)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 value,
-                style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold),
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5),
               ),
               if (progress != null)
                 SizedBox(
-                  width: 32, height: 32,
+                  width: 36, height: 36,
                   child: CircularProgressIndicator(
                     value: progress,
-                    strokeWidth: 3,
-                    backgroundColor: Colors.white10,
+                    strokeWidth: 4,
+                    backgroundColor: AppColors.background,
                     valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
                 ),
@@ -570,14 +485,26 @@ Analysis: ${widget.result.cause}
 
   Widget _buildSectionTitle(IconData icon, String title, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 12),
           Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
           ),
         ],
       ),
@@ -586,15 +513,30 @@ Analysis: ${widget.result.cause}
 
   Widget _buildGlassInfoCard(String content, {required IconData icon, required Color iconColor}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: iconColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: iconColor.withOpacity(0.1)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppColors.softShadow,
+        border: Border.all(color: AppColors.primary.withOpacity(0.05)),
       ),
-      child: Text(
-        content,
-        style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              content,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                height: 1.6,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -602,16 +544,20 @@ Analysis: ${widget.result.cause}
   Widget _buildSymptomsTags() {
     final symptoms = widget.result.symptoms.split(',');
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       children: symptoms.map((s) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppColors.softShadow,
+          border: Border.all(color: AppColors.primary.withOpacity(0.05)),
         ),
-        child: Text(s.trim(), style: const TextStyle(color: Colors.white54, fontSize: 13)),
+        child: Text(
+          s.trim().toUpperCase(), 
+          style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)
+        ),
       )).toList(),
     );
   }
@@ -620,20 +566,21 @@ Analysis: ${widget.result.cause}
     final steps = _translatedSteps.isEmpty ? widget.result.treatmentSteps : _translatedSteps;
     
     if (steps.isEmpty) {
-      return _buildGlassInfoCard('No specific treatment steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+      return _buildGlassInfoCard('No specific treatment steps available.', icon: LucideIcons.info, iconColor: AppColors.info);
     }
 
     return TreatmentStepsWidget(
       steps: steps,
-      themeColor: const Color(0xFF10B981),
+      themeColor: AppColors.primary,
     );
   }
+
 
   Widget _buildStepsList(List<String> steps, {String type = 'organic'}) {
     final structuredList = _structuredTreatments != null ? _structuredTreatments![type] as List? : null;
 
     if (steps.isEmpty && (structuredList == null || structuredList.isEmpty)) {
-      return _buildGlassInfoCard('No steps available.', icon: Icons.info_outline, iconColor: Colors.blueAccent);
+      return _buildGlassInfoCard('No steps available.', icon: LucideIcons.info, iconColor: AppColors.info);
     }
 
     return Column(
@@ -656,40 +603,49 @@ Analysis: ${widget.result.cause}
               TTSService.speakText(stepText, _targetLanguage);
             },
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.blueGrey.shade900,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: AppColors.softShadow,
+                border: Border.all(color: AppColors.primary.withOpacity(0.05)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: const Color(0xFF10B981),
-                    child: Text(
-                      "$stepNumber",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        "$stepNumber",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Text(
                       stepText,
                       style: TextStyle(
-                        color: _isTranslating ? Colors.white38 : Colors.white,
+                        color: _isTranslating ? AppColors.textHint : AppColors.textPrimary,
                         fontSize: 15,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.volume_up, size: 18, color: Colors.white24),
+                  const Icon(LucideIcons.volume2, size: 18, color: AppColors.primary),
                 ],
               ),
             ),
@@ -703,40 +659,45 @@ Analysis: ${widget.result.cause}
     final speechText = "Apply $name. Dosage $dosage. Repeat $frequency.";
     
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: GestureDetector(
         onTap: () => TTSService.speakText(speechText, _targetLanguage),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            gradient: LinearGradient(
+              colors: [AppColors.primary.withOpacity(0.08), AppColors.primary.withOpacity(0.02)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+            boxShadow: AppColors.softShadow,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.medication, color: Colors.greenAccent, size: 20),
-                  const SizedBox(width: 8),
+                  const Icon(LucideIcons.beaker, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       name,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  Icon(Icons.volume_up, color: Colors.white.withOpacity(0.5), size: 18),
+                  const Icon(LucideIcons.volume2, color: AppColors.primary, size: 18),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildDosageInfoRow(LucideIcons.flaskConical, "Dosage: ", dosage),
               const SizedBox(height: 8),
-              _buildDosageInfoRow(Icons.science_outlined, "Dosage: ", dosage),
-              const SizedBox(height: 4),
-              _buildDosageInfoRow(Icons.event_repeat, "Frequency: ", frequency),
+              _buildDosageInfoRow(LucideIcons.calendar, "Frequency: ", frequency),
             ],
           ),
         ),
@@ -747,22 +708,23 @@ Analysis: ${widget.result.cause}
   Widget _buildDosageInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, color: Colors.greenAccent.withOpacity(0.7), size: 14),
-        const SizedBox(width: 6),
+        Icon(icon, color: AppColors.primary.withOpacity(0.6), size: 14),
+        const SizedBox(width: 8),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
           ),
         ),
         Expanded(
           child: Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -770,21 +732,21 @@ Analysis: ${widget.result.cause}
     );
   }
 
-  // US20: Heatmap viewer with toggle
   Widget _buildHeatmapViewer() {
     return Column(
       children: [
         GestureDetector(
           onTap: () => setState(() => _showHeatmapOverlay = !_showHeatmapOverlay),
           child: Container(
-            height: 220,
+            height: 240,
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppColors.softShadow,
+              border: Border.all(color: AppColors.primary.withOpacity(0.1)),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -797,36 +759,39 @@ Analysis: ${widget.result.cause}
                   else
                     _buildImage(),
                   Positioned(
-                    bottom: 8,
-                    right: 8,
+                    bottom: 12,
+                    right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: _showHeatmapOverlay
-                            ? Colors.redAccent.withOpacity(0.3)
-                            : Colors.black54,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _showHeatmapOverlay
-                              ? Colors.redAccent.withOpacity(0.5)
-                              : Colors.white24,
-                        ),
+                            ? Colors.red.withOpacity(0.9)
+                            : AppColors.primary.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _showHeatmapOverlay ? Icons.layers_clear : Icons.layers,
+                            _showHeatmapOverlay ? LucideIcons.eye : LucideIcons.layers,
                             size: 14,
-                            color: _showHeatmapOverlay ? Colors.redAccent : Colors.white70,
+                            color: Colors.white,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 6),
                           Text(
-                            _showHeatmapOverlay ? 'Original' : 'Heatmap',
-                            style: TextStyle(
-                              color: _showHeatmapOverlay ? Colors.redAccent : Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            _showHeatmapOverlay ? 'SHOW ORIGINAL' : 'SHOW HEATMAP',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
@@ -838,93 +803,17 @@ Analysis: ${widget.result.cause}
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Tap to toggle affected area heatmap',
-          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+        const SizedBox(height: 12),
+        const Text(
+          'TAP IMAGE TO TOGGLE ANALYSIS OVERLAY',
+          style: TextStyle(
+            color: AppColors.textHint, 
+            fontSize: 11, 
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+          ),
         ),
       ],
-    );
-  }
-
-  // US18: Top predictions bar chart
-  Widget _buildTopPredictionsSection() {
-    final predictions = widget.result.topPredictions;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
-      child: Column(
-        children: predictions.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final pred = entry.value;
-          final conf = (pred['confidence'] as num?)?.toDouble() ?? 0.0;
-          final disease = pred['disease'] as String? ?? 'Unknown';
-          final isTop = idx == 0;
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: idx < predictions.length - 1 ? 8 : 0),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  child: Text(
-                    '${idx + 1}',
-                    style: TextStyle(
-                      color: isTop ? const Color(0xFF10B981) : Colors.white38,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    disease,
-                    style: TextStyle(
-                      color: isTop ? Colors.white : Colors.white60,
-                      fontSize: 12,
-                      fontWeight: isTop ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 4,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: conf,
-                      minHeight: 6,
-                      backgroundColor: Colors.white.withOpacity(0.06),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isTop ? const Color(0xFF10B981) : const Color(0xFF818CF8).withOpacity(0.5),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    '${(conf * 100).toStringAsFixed(1)}%',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: isTop ? const Color(0xFF10B981) : Colors.white38,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
     );
   }
 
@@ -932,15 +821,15 @@ Analysis: ${widget.result.cause}
     switch (severity.toLowerCase()) {
       case 'severe':
       case 'high':
-        return Colors.redAccent;
+        return AppColors.error;
       case 'moderate':
       case 'medium':
-        return Colors.amberAccent;
+        return AppColors.warning;
       case 'low':
       case 'healthy':
-        return Colors.greenAccent;
+        return AppColors.success;
       default:
-        return Colors.blueAccent;
+        return AppColors.info;
     }
   }
 
@@ -948,38 +837,37 @@ Analysis: ${widget.result.cause}
     return Row(
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withOpacity(0.15),
-            border: Border.all(color: color.withOpacity(0.4)),
+            color: color.withOpacity(0.1),
           ),
-          child: Icon(icon, color: color, size: 18),
+          child: Icon(icon, color: color, size: 20),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(8),
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             duration,
             style: TextStyle(
               color: color,
               fontSize: 13,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
