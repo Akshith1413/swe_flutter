@@ -9,8 +9,9 @@ import 'database_service.dart';
 
 /// Service for crop disease analysis.
 ///
-/// Sends images to the AI model, receives predictions with severity, confidence,
-/// top-N predictions, and Grad-CAM heatmaps, then enriches with LLM advice.
+/// Sends images to the backend /analyze endpoint, which internally calls
+/// the HuggingFace CNN model AND the Gemini LLM, returning everything in
+/// a single response. This means a single HTTP round-trip from the app.
 class CropService {
   // Fixed class labels that exactly match the CNN training order from the backend.
   static const List<String> classLabels = [
@@ -55,11 +56,14 @@ class CropService {
   ];
 
   /// Analyzes an image to detect crop diseases.
-  /// 
+  ///
   /// - [imagePath]: Path to the image file.
-  /// 
-  /// Returns an [AnalysisResult] with diagnostic data including enhanced fields:
-  /// topPredictions, severity classification, and Grad-CAM heatmap.
+  ///
+  /// Sends the image to the Render backend's /api/crop-advice/analyze endpoint,
+  /// which calls the HuggingFace CNN (Gate checks, prediction, Grad-CAM) and
+  /// the Gemini LLM (advice) in a single server-side pipeline.
+  ///
+  /// Returns an [AnalysisResult] with all diagnostic data.
   Future<AnalysisResult> analyzeImage(String imagePath) async {
     Map<String, dynamic>? prediction;
 
@@ -67,87 +71,166 @@ class CropService {
       // 1. Read the image as bytes (Web-compatible using XFile)
       final List<int> imageBytes = await XFile(imagePath).readAsBytes();
 
-      // 2. Send the image bytes to the AI model
+      // 2. Send the image to the backend analyze endpoint
+      //    (backend calls CNN + LLM via HuggingFace and returns merged result)
       prediction = await AIPredictionService.predict(imageBytes);
     } catch (e) {
       debugPrint('AI prediction request failed: $e');
-      throw Exception('Could not connect to AI service. Please check your internet connection.');
+      // Re-throw specific messages that should be shown via error bottom sheet
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.contains('leaf') ||
+          msg.contains('drawing') ||
+          msg.contains('illustration') ||
+          msg.contains('confidence') ||
+          msg.contains('timeout') ||
+          msg.contains('starting up') ||
+          msg.contains('unavailable')) {
+        throw Exception(msg);
+      }
+      throw Exception(
+          'Could not connect to AI service. Please check your internet connection.');
     }
 
-    // 3. Handle explicit AI rejection (e.g., non-leaf)
+    // 3. Handle explicit AI rejection (e.g., non-leaf, low confidence)
     if (prediction != null && prediction["success"] == false) {
       // Use the specific human-readable message from the backend gates
-      final errorMsg = prediction["message"] ?? prediction["error"] ?? "Could not identify a leaf in the image.";
+      final errorMsg = prediction["message"] as String? ??
+          prediction["error"] as String? ??
+          "Could not identify a leaf in the image.";
       throw Exception(errorMsg);
     }
 
-    // 4. Check if we have a valid AI response with class_index
-    if (prediction != null && prediction.containsKey("class_index")) {
-      // 5. Extract the prediction
-      final int classIndex = prediction["class_index"];
-      final double confidence = prediction["confidence"];
-      // Note: Confidence threshold is now handled purely on the backend.
+    // 4. Check if we have a valid AI response with class_name
+    if (prediction != null && prediction.containsKey("class_name")) {
+      // 5. Extract prediction fields
+      final double confidence =
+          (prediction["confidence"] as num).toDouble();
 
-      // 7. Use server-provided class name or fall back to local mapping
-      final String diseaseName = prediction["class_name"] ?? classLabels[classIndex];
-      
+      // 6. Use server-provided class name
+      final String diseaseName =
+          prediction["class_name"] as String? ?? 'Unknown___Unknown';
+
       print("Predicted disease: $diseaseName");
       print("Confidence: $confidence");
 
-      // 8. Extract crop name — prefer server-provided, fallback to parsing
-      final String cropName = prediction["crop_name"] ??
+      // 7. Extract crop name
+      final String cropName = prediction["crop_name"] as String? ??
           diseaseName.split('___').first.replaceAll('_', ' ');
 
-      // 9. Extract enhanced fields from AI response
-      final List<Map<String, dynamic>> topPredictions = prediction["top_predictions"] != null
-          ? List<Map<String, dynamic>>.from(
-              (prediction["top_predictions"] as List).map((e) => Map<String, dynamic>.from(e)))
-          : [];
+      // 8. Extract enhanced fields
+      final List<Map<String, dynamic>> topPredictions =
+          prediction["top_predictions"] != null
+              ? List<Map<String, dynamic>>.from(
+                  (prediction["top_predictions"] as List)
+                      .map((e) => Map<String, dynamic>.from(e as Map)))
+              : [];
 
-      final String? heatmapBase64 = prediction["heatmap_base64"];
+      final String? heatmapBase64 =
+          prediction["heatmap_base64"] as String?;
 
-      // Severity from AI service
-      final Map<String, dynamic>? severityData = prediction["severity"] is Map
-          ? Map<String, dynamic>.from(prediction["severity"])
-          : null;
+      // 9. Severity
+      final Map<String, dynamic>? severityData =
+          prediction["severity"] is Map
+              ? Map<String, dynamic>.from(prediction["severity"] as Map)
+              : null;
 
-      final String severityLevel = severityData?["level"] ?? "moderate";
-      final String severityLabel = severityData?["label"] ?? 
-          (confidence > 0.8 ? "High" : (confidence > 0.6 ? "Moderate" : "Low"));
-      final String severityDescription = severityData?["description"] ?? "";
+      final String severityLevel =
+          severityData?["level"] as String? ?? "moderate";
+      final String severityLabel = severityData?["label"] as String? ??
+          (confidence > 0.8
+              ? "High"
+              : (confidence > 0.6 ? "Moderate" : "Low"));
+      final String severityDescription =
+          severityData?["description"] as String? ?? "";
 
-      // 10. Call the CropAdviceService with mapped disease name
-      final result = await CropAdviceService.getCropAdvice(
-        crop: cropName,
-        disease: diseaseName,
-        severity: severityLabel,
-        confidence: confidence,
-      );
+      // 10. Build result from the embedded advice (backend already called LLM).
+      //     Falls back to a second CropAdviceService call only if advice is missing.
+      AnalysisResult result;
 
-      // 11. Update image URL and finalize with enhanced fields
-      final finalResult = result.copyWith(
-        imageUrl: imagePath,
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        date: DateTime.now(),
-        topPredictions: topPredictions,
-        heatmapBase64: heatmapBase64,
-        severityLevel: severityLevel,
-        severityDescription: severityDescription,
-      );
+      final prebuiltAdvice =
+          prediction["_advice"] as Map<String, dynamic>?;
 
-      // Save to history (SQLite - US 24)
-      if (!kIsWeb) {
-        await databaseService.saveDiagnosis(finalResult);
+      if (prebuiltAdvice != null) {
+        // ✅ Happy path: use advice embedded in the analyze response
+        result = AnalysisResult(
+          id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
+          date: DateTime.now(),
+          imageUrl: imagePath,
+          crop: cropName,
+          disease: diseaseName,
+          severity: severityLabel,
+          confidence: confidence,
+          cause: prebuiltAdvice['cause'] as String? ?? '',
+          symptoms: prebuiltAdvice['symptoms'] as String? ?? '',
+          immediate: prebuiltAdvice['immediate'] as String? ?? '',
+          chemical: prebuiltAdvice['chemical'] as String? ?? '',
+          organic: prebuiltAdvice['organic'] as String? ?? '',
+          prevention: prebuiltAdvice['prevention'] as String? ?? '',
+          treatmentSteps: [
+            prebuiltAdvice['immediate'] as String? ?? '',
+            prebuiltAdvice['chemical'] as String? ?? '',
+            prebuiltAdvice['organic'] as String? ?? '',
+            prebuiltAdvice['prevention'] as String? ?? '',
+          ].where((s) => s.isNotEmpty).toList(),
+          organicSteps: [
+            prebuiltAdvice['organic'] as String? ?? ''
+          ].where((s) => s.isNotEmpty).toList(),
+          chemicalSteps: [
+            prebuiltAdvice['chemical'] as String? ?? ''
+          ].where((s) => s.isNotEmpty).toList(),
+          recoveryTimeline: prebuiltAdvice['recoveryTimeline'] != null
+              ? Map<String, dynamic>.from(
+                  prebuiltAdvice['recoveryTimeline'] as Map)
+              : {
+                  'initialDays': '3-5',
+                  'fullRecoveryDays': '14-21',
+                  'monitoringDays': '30',
+                  'description': ''
+                },
+          preventionChecklist:
+              prebuiltAdvice['preventionChecklist'] != null
+                  ? List<String>.from(
+                      prebuiltAdvice['preventionChecklist'] as List)
+                  : [prebuiltAdvice['prevention'] as String? ?? ''],
+          topPredictions: topPredictions,
+          heatmapBase64: heatmapBase64,
+          severityLevel: severityLevel,
+          severityDescription: severityDescription,
+        );
+      } else {
+        // ⚠️ Fallback: call CropAdviceService separately
+        // (used during local dev or if backend response doesn't include advice)
+        final adviceResult = await CropAdviceService.getCropAdvice(
+          crop: cropName,
+          disease: diseaseName,
+          severity: severityLabel,
+          confidence: confidence,
+        );
+        result = adviceResult.copyWith(
+          imageUrl: imagePath,
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          date: DateTime.now(),
+          topPredictions: topPredictions,
+          heatmapBase64: heatmapBase64,
+          severityLevel: severityLevel,
+          severityDescription: severityDescription,
+        );
       }
-      
-      // Keep SharedPreferences save for current session if needed
-      await preferencesService.saveAnalysisResult(finalResult.toJson());
 
-      return finalResult;
+      // 11. Save to history
+      if (!kIsWeb) {
+        await databaseService.saveDiagnosis(result);
+      }
+
+      // Keep SharedPreferences save for current session
+      await preferencesService.saveAnalysisResult(result.toJson());
+
+      return result;
     }
 
     // 12. Final fallback for unexpected states
-    throw Exception('An unexpected error occurred during analysis. Please try again.');
+    throw Exception(
+        'An unexpected error occurred during analysis. Please try again.');
   }
 }
 

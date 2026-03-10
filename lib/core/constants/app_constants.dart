@@ -45,5 +45,6 @@ class AppConstants {
   // static const String baseApiUrl = 'http://localhost:5000';
   // Use production backend deployed on Render
   static const String baseApiUrl = 'https://swe-ai-crop-back-kfkg.onrender.com';
-  static const Duration apiTimeout = Duration(seconds: 30);
+  // Increased timeout: Render + HuggingFace cold starts can take up to 90s
+  static const Duration apiTimeout = Duration(seconds: 120);
 }

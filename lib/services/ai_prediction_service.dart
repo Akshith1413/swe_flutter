@@ -1,59 +1,108 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/constants/app_constants.dart';
 
-/// Service for communicating with the Python AI disease prediction model.
+/// Service for communicating with the crop disease prediction pipeline.
 ///
-/// Sends image bytes to the FastAPI `/predict` endpoint and returns the full
-/// enhanced prediction result including class name, top-N predictions,
-/// severity classification, and Grad-CAM heatmap.
+/// Routes requests through the deployed Render backend (/api/crop-advice/analyze),
+/// which in turn forwards to the Hugging Face AI service (CNN + Grad-CAM).
+/// This ensures the app works on real devices where localhost is not accessible.
 class AIPredictionService {
-  static const String aiUrl = "http://localhost:5001/predict";
+  /// The backend analyze endpoint that proxies to the HuggingFace AI model.
+  static String get analyzeUrl => '${AppConstants.baseApiUrl}/api/crop-advice/analyze';
 
-  /// Sends [imageBytes] to the AI model and returns the full prediction map.
+  /// Sends [imageBytes] to the backend analyze pipeline and returns the
+  /// full prediction map.
   ///
-  /// Response fields:
-  /// - `success` (bool)
-  /// - `class_index` (int)
-  /// - `class_name` (String) — full label, e.g. "Tomato___Late_blight"
-  /// - `crop_name` (String) — e.g. "Tomato"
-  /// - `disease_name` (String) — e.g. "Late blight"
+  /// Response fields (when success == true):
+  /// - `crop` (String) — e.g. "Tomato"
+  /// - `disease` (String) — e.g. "Late blight"
   /// - `confidence` (double)
-  /// - `top_predictions` (List) — top-5 predictions with names+scores
   /// - `severity` (Map) — { level, label, description }
-  /// - `heatmap_base64` (String?) — Grad-CAM overlay as base64 PNG
+  /// - `topPredictions` (List) — top-5 predictions with names+scores
+  /// - `heatmapBase64` (String?) — Grad-CAM overlay as base64 PNG
+  /// - `advice` (Map) — LLM-generated treatment advice
+  ///
+  /// The response is normalized to match the expected schema used by
+  /// [CropService.analyzeImage].
   static Future<Map<String, dynamic>> predict(List<int> imageBytes) async {
-    var request = http.MultipartRequest(
-      "POST",
-      Uri.parse(aiUrl),
-    );
+    final uri = Uri.parse(analyzeUrl);
+    final request = http.MultipartRequest('POST', uri);
 
     request.files.add(
       http.MultipartFile.fromBytes(
-        "file",
+        'file',
         imageBytes,
-        filename: "leaf.jpg",
+        filename: 'leaf.jpg',
       ),
     );
 
-    var response = await request.send();
-    var responseBody = await response.stream.bytesToString();
+    print('Sending image to backend analyze endpoint: $analyzeUrl');
 
-    print("AI RAW RESPONSE length: ${responseBody.length}");
+    // Use a long timeout: Render + HuggingFace can have cold starts (60-90s)
+    final streamedResponse = await request.send().timeout(
+      const Duration(seconds: 120),
+      onTimeout: () => throw Exception(
+        'Request timed out. The AI service may be starting up — please try again in a moment.',
+      ),
+    );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to get prediction from AI model: ${response.statusCode}');
+    final responseBody = await streamedResponse.stream.bytesToString();
+    print('Backend analyze response (${streamedResponse.statusCode}), length: ${responseBody.length}');
+
+    if (streamedResponse.statusCode != 200) {
+      throw Exception(
+        'AI analysis failed (HTTP ${streamedResponse.statusCode}). Please try again.',
+      );
     }
 
-    final result = jsonDecode(responseBody);
-    
-    if (result is Map<String, dynamic>) {
-      print("AI class_name: ${result['class_name']}");
-      print("AI confidence: ${result['confidence']}");
-      print("AI severity: ${result['severity']?['level']}");
-      print("AI top_predictions count: ${(result['top_predictions'] as List?)?.length ?? 0}");
-      print("AI heatmap_base64 present: ${result['heatmap_base64'] != null}");
+    final raw = jsonDecode(responseBody) as Map<String, dynamic>;
+
+    // If the backend returned success:false (e.g. low confidence, no leaf)
+    // surface the error message directly so CropService can show it to the user.
+    if (raw['success'] == false) {
+      print('Backend returned failure: ${raw['message'] ?? raw['error']}');
+      return {
+        'success': false,
+        'message': raw['message'] ?? raw['error'] ?? 'Could not identify a leaf in the image.',
+        'error':   raw['error'],
+      };
     }
 
-    return result;
+    // Normalize the backend response so that CropService sees the same schema
+    // as it did when calling the AI service directly.
+    //
+    // Backend /analyze returns:
+    //   { success, crop, disease, confidence, severity, topPredictions,
+    //     heatmapBase64, advice }
+    // CropService expects:
+    //   { success, class_index, class_name, crop_name, disease_name,
+    //     confidence, top_predictions, severity, heatmap_base64 }
+    final cropName    = raw['crop']    as String? ?? '';
+    final diseaseName = raw['disease'] as String? ?? '';
+    final className   = '${cropName.replaceAll(' ', '_')}___${diseaseName.replaceAll(' ', '_')}';
+
+    final normalized = <String, dynamic>{
+      'success':         true,
+      'class_index':     0,           // Not needed downstream — class_name takes priority
+      'class_name':      className,
+      'crop_name':       cropName,
+      'disease_name':    diseaseName,
+      'confidence':      raw['confidence'],
+      'severity':        raw['severity'],
+      'top_predictions': raw['topPredictions'] ?? [],
+      'heatmap_base64':  raw['heatmapBase64'],
+      // Carry advice through so CropService can skip the second LLM call if desired
+      '_advice':         raw['advice'],
+    };
+
+    print('AI crop_name: $cropName');
+    print('AI disease_name: $diseaseName');
+    print('AI confidence: ${raw['confidence']}');
+    print('AI severity: ${(raw['severity'] as Map?)?.values.first}');
+    print('AI top_predictions count: ${(raw['topPredictions'] as List?)?.length ?? 0}');
+    print('AI heatmap_base64 present: ${raw['heatmapBase64'] != null}');
+
+    return normalized;
   }
 }
