@@ -9,7 +9,7 @@ import '../widgets/crop_advice_card.dart';
 import '../services/feedback_service.dart';
 import '../services/explanation_service.dart';
 import '../services/preferences_service.dart';
-import '../services/tts_service.dart';
+import '../services/sarvam_tts_service.dart';
 import '../widgets/treatment_steps_widget.dart';
 import 'chatbot_view.dart';
 import 'dart:developer' as dev;
@@ -54,10 +54,25 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   final TextEditingController _commentController = TextEditingController();
   bool _feedbackSubmitted = false;
   bool _feedbackSubmitting = false;
-  
-  // US23: Voice output state
-  bool _voiceEnabled = true;
-  bool _isSpeaking = false;
+
+  // ── Language & Translation state ──────────────────────────────────────
+  /// Currently active language for the page (e.g. 'te', 'en')
+  String _activeLangCode = 'en';
+
+  /// All translated strings for the page, keyed by an internal ID.
+  /// While null the page shows English. Once populated it replaces
+  /// every text widget. Falls back to English gracefully.
+  Map<String, String>? _translations;          // flat strings
+  List<String>? _txTreatmentSteps;             // translated steps list
+  List<String>? _txPreventionChecklist;        // translated prevention list
+  List<String>? _txTopPredictionNames;         // translated disease names
+
+  bool _isTranslating = false;
+  String? _translationError;
+
+  // ── Audio state ────────────────────────────────────────────────────────
+  bool _isLoadingAudio = false;
+  bool _isPlayingAudio = false;
 
   @override
   void initState() {
@@ -82,39 +97,157 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
       if (mounted) _confidenceAnimController.forward();
     });
 
-    _loadVoicePreference();
+    _loadInitialLanguage();
   }
 
-  Future<void> _loadVoicePreference() async {
-    final enabled = await preferencesService.isVoiceEnabled();
-    if (mounted) {
-      setState(() => _voiceEnabled = enabled);
-      if (_voiceEnabled) {
-        _startVoiceOverview();
+  /// Read saved language from preferences, then kick-off translation
+  Future<void> _loadInitialLanguage() async {
+    final langCode = await preferencesService.getLanguage() ?? 'en';
+    final mappedCode = SarvamTTSService.mapToSarvamCode(langCode);
+    if (mounted && mappedCode != 'en') {
+      // Delay slightly so the page renders in English first
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) _changeLanguage(mappedCode);
+    } else if (mounted) {
+      setState(() => _activeLangCode = mappedCode);
+    }
+  }
+
+  // ── Translation logic ──────────────────────────────────────────────────
+
+  /// Collect every English string that needs translating and send as one batch.
+  /// Indices are used to split the flat response back into named groups.
+  Future<void> _changeLanguage(String langCode) async {
+    if (_isTranslating) return;
+    setState(() {
+      _activeLangCode = langCode;
+      _isTranslating = true;
+      _translationError = null;
+      // Stop any audio if playing
+      if (_isPlayingAudio) {
+        SarvamTTSService.stop();
+        _isPlayingAudio = false;
+        _isLoadingAudio = false;
+      }
+    });
+
+    try {
+      final r = widget.result;
+      final simpleExp = ExplanationService.getSimpleExplanation(r.disease);
+      final diseaseName = _formatDiseaseName(r.disease);
+      final severityDesc = r.severityDescription;
+      final timelineDesc = r.recoveryTimeline['description'] as String? ?? '';
+
+      // Collect top-prediction disease names
+      final predNames = r.topPredictions
+          .map((p) => p['disease'] as String? ?? '')
+          .toList();
+
+      // Flat list order (remember indices!)
+      final allTexts = [
+        diseaseName,          // 0
+        simpleExp,            // 1
+        severityDesc,         // 2
+        timelineDesc,         // 3
+        ...r.treatmentSteps,  // 4 .. 4+steps.len-1
+        ...r.preventionChecklist, // next block
+        ...predNames,         // last block
+      ];
+
+      if (langCode == 'en') {
+        // English: reset to original
+        setState(() {
+          _translations = null;
+          _txTreatmentSteps = null;
+          _txPreventionChecklist = null;
+          _txTopPredictionNames = null;
+          _isTranslating = false;
+        });
+        return;
+      }
+
+      final translated = await SarvamTTSService.translateBatch(
+        texts: allTexts,
+        targetLangCode: langCode,
+      );
+
+      final int stepsLen = r.treatmentSteps.length;
+      final int prevLen = r.preventionChecklist.length;
+      final int predLen = predNames.length;
+
+      setState(() {
+        _translations = {
+          'diseaseName':  translated[0],
+          'simpleExp':    translated[1],
+          'severityDesc': translated[2],
+          'timelineDesc': translated[3],
+        };
+        _txTreatmentSteps = translated.sublist(4, 4 + stepsLen);
+        _txPreventionChecklist = translated.sublist(4 + stepsLen, 4 + stepsLen + prevLen);
+        _txTopPredictionNames = translated.sublist(4 + stepsLen + prevLen, 4 + stepsLen + prevLen + predLen);
+        _isTranslating = false;
+      });
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTranslating = false;
+          _translationError = 'Translation failed. Showing English.';
+        });
       }
     }
   }
 
-  Future<void> _startVoiceOverview() async {
-    if (!_voiceEnabled) return;
-    
-    setState(() => _isSpeaking = true);
-    final explanation = ExplanationService.formatForSpeech(widget.result);
-    final lang = await preferencesService.getLanguage() ?? 'en-US';
-    
-    await TTSService.speakText(explanation, lang);
-    if (mounted) setState(() => _isSpeaking = false);
+  /// Helper: return translated string if available, else English fallback.
+  String _tx(String key, String englishFallback) {
+    return _translations?[key] ?? englishFallback;
   }
 
-  void _toggleVoice() async {
-    final newState = !_voiceEnabled;
-    setState(() => _voiceEnabled = newState);
-    await preferencesService.setVoiceEnabled(newState);
-    if (!newState) {
-      await TTSService.stop();
-    } else {
-      _startVoiceOverview();
+  // ── Audio playback ─────────────────────────────────────────────────────
+
+  /// Build the full page narration string from translated (or English) text
+  String _buildNarrationText() {
+    final r = widget.result;
+    final disease = _tx('diseaseName', _formatDiseaseName(r.disease));
+    final simple  = _tx('simpleExp',  ExplanationService.getSimpleExplanation(r.disease));
+    final sevDesc = _tx('severityDesc', r.severityDescription);
+    final steps   = (_txTreatmentSteps ?? r.treatmentSteps).join('. ');
+    final prev    = (_txPreventionChecklist ?? r.preventionChecklist).join('. ');
+
+    return [
+      if (disease.isNotEmpty) '$disease.',
+      if (simple.isNotEmpty)  '$simple.',
+      if (sevDesc.isNotEmpty) 'Severity assessment: $sevDesc.',
+      if (steps.isNotEmpty)   'Treatment steps: $steps.',
+      if (prev.isNotEmpty)    'Prevention tips: $prev.',
+    ].join(' ');
+  }
+
+  Future<void> _toggleAudio() async {
+    if (_isTranslating) return;
+    if (_isLoadingAudio) return;
+
+    if (_isPlayingAudio) {
+      await SarvamTTSService.stop();
+      if (mounted) setState(() => _isPlayingAudio = false);
+      return;
     }
+
+    setState(() { _isLoadingAudio = true; });
+
+    await SarvamTTSService.speak(
+      text: _buildNarrationText(),
+      langCode: _activeLangCode,
+      onStart: () {
+        if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = true; });
+      },
+      onComplete: () {
+        if (mounted) setState(() => _isPlayingAudio = false);
+      },
+      onError: (_) {
+        if (mounted) setState(() { _isLoadingAudio = false; _isPlayingAudio = false; });
+      },
+    );
   }
 
   @override
@@ -122,6 +255,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
     _confidenceAnimController.dispose();
     _fadeController.dispose();
     _commentController.dispose();
+    SarvamTTSService.stop();
     super.dispose();
   }
 
@@ -215,6 +349,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 8),
+                    // ── Language selector + audio bar ──────────────────
+                    _buildLanguageAudioBar(),
+                    const SizedBox(height: 14),
+                    // ── Content sections use translated text ───────────
                     _buildDiseaseIdentificationCard(),
                     const SizedBox(height: 12),
                     _buildSimpleExplanationCard(),
@@ -229,13 +367,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                     const SizedBox(height: 24),
                     _buildSeverityDetailCard(),
                     const SizedBox(height: 24),
-                    // US30: Recovery Timeline
                     _buildRecoveryTimeline(),
                     const SizedBox(height: 24),
-                    // US31: Prevention Checklist
                     _buildPreventionChecklist(),
                     const SizedBox(height: 24),
-                    // US32: Treatment Feedback
                     _buildFeedbackSection(),
                     const SizedBox(height: 28),
                     _buildFullReportButton(),
@@ -246,6 +381,178 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ==================== LANGUAGE + AUDIO BAR ====================
+
+  Widget _buildLanguageAudioBar() {
+    final activeLang = SarvamTTSService.getLanguage(_activeLangCode) ??
+        sarvamTTSLanguages.last;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF6366F1).withOpacity(0.3),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withOpacity(0.08),
+            blurRadius: 20,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row with audio button
+          Row(
+            children: [
+              Icon(
+                Icons.translate_rounded,
+                size: 15,
+                color: const Color(0xFF818CF8).withOpacity(0.9),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _isTranslating
+                      ? 'Translating page to ${activeLang.name}...'
+                      : _activeLangCode == 'en'
+                          ? 'Select language to translate page'
+                          : 'Page translated to ${activeLang.nativeName}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (_isTranslating)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.8,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF818CF8)),
+                  ),
+                )
+              else
+                // Audio play/stop button
+                GestureDetector(
+                  onTap: _toggleAudio,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _isPlayingAudio
+                            ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                            : [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isPlayingAudio
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF6366F1))
+                              .withOpacity(0.35),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _isLoadingAudio
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.6,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Icon(
+                                _isPlayingAudio
+                                    ? Icons.stop_rounded
+                                    : Icons.volume_up_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _isLoadingAudio
+                              ? 'Loading...'
+                              : _isPlayingAudio
+                                  ? 'Stop'
+                                  : 'Listen',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (_translationError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _translationError!,
+              style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11),
+            ),
+          ],
+          const SizedBox(height: 10),
+          // Language chips
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: sarvamTTSLanguages.map((lang) {
+              final isSelected = _activeLangCode == lang.code;
+              return GestureDetector(
+                onTap: _isTranslating ? null : () => _changeLanguage(lang.code),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF6366F1).withOpacity(0.3)
+                        : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF818CF8)
+                          : Colors.white.withOpacity(0.1),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    lang.nativeName,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -476,7 +783,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _formatDiseaseName(widget.result.disease),
+                  _tx('diseaseName', _formatDiseaseName(widget.result.disease)),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -502,7 +809,8 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   // ==================== SIMPLE EXPLANATION (US23) ====================
 
   Widget _buildSimpleExplanationCard() {
-    final simpleExp = ExplanationService.getSimpleExplanation(widget.result.disease);
+    final simpleExp = _tx('simpleExp',
+        ExplanationService.getSimpleExplanation(widget.result.disease));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -515,49 +823,38 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(LucideIcons.sparkles, size: 16, color: Colors.purple.shade300),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Simple Explanation',
-                    style: TextStyle(
-                      color: Colors.purple.shade300,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              // US23: Voice Toggle
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: _toggleVoice,
-                icon: Icon(
-                  _voiceEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                  color: _voiceEnabled ? const Color(0xFF10B981) : Colors.white24,
-                  size: 20,
+              Icon(LucideIcons.sparkles, size: 16, color: Colors.purple.shade300),
+              const SizedBox(width: 8),
+              Text(
+                'Simple Explanation',
+                style: TextStyle(
+                  color: Colors.purple.shade300,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            simpleExp,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 15,
-              height: 1.5,
-              fontStyle: FontStyle.italic,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Text(
+              simpleExp,
+              key: ValueKey(simpleExp),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 15,
+                height: 1.5,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
 
   // ==================== TREATMENT STEPS (US25) ====================
 
@@ -570,7 +867,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
         border: Border.all(color: const Color(0xFF10B981).withOpacity(0.1)),
       ),
       child: TreatmentStepsWidget(
-        steps: widget.result.treatmentSteps,
+        steps: _txTreatmentSteps ?? widget.result.treatmentSteps,
         themeColor: const Color(0xFF10B981),
       ),
     );
@@ -882,7 +1179,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
               final idx = entry.key;
               final pred = entry.value;
               final conf = (pred['confidence'] as num?)?.toDouble() ?? 0.0;
-              final disease = pred['disease'] as String? ?? 'Unknown';
+              // Use translated disease name if available
+              final disease = (_txTopPredictionNames != null && idx < _txTopPredictionNames!.length)
+                  ? _txTopPredictionNames![idx]
+                  : (pred['disease'] as String? ?? 'Unknown');
               final crop = pred['crop'] as String? ?? '';
               final isTop = idx == 0;
 
@@ -1087,7 +1387,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
   Widget _buildSeverityDetailCard() {
     final level = widget.result.severityLevel;
     final color = _severityColor(level);
-    final description = widget.result.severityDescription;
+    final description = _tx('severityDesc', widget.result.severityDescription);
 
     if (description.isEmpty) return const SizedBox.shrink();
 
@@ -1272,7 +1572,7 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          timeline['description'],
+                          _tx('timelineDesc', timeline['description'] as String? ?? ''),
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.5),
                             fontSize: 12,
@@ -1357,7 +1657,10 @@ class _DiagnosisResultScreenState extends State<DiagnosisResultScreen>
           child: Column(
             children: checklist.asMap().entries.map((entry) {
               final idx = entry.key;
-              final tip = entry.value;
+              // Use translated item if available
+              final tip = (_txPreventionChecklist != null && idx < _txPreventionChecklist!.length)
+                  ? _txPreventionChecklist![idx]
+                  : entry.value;
               final isChecked = _checkedItems.contains(idx);
 
               return InkWell(
