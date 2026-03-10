@@ -201,6 +201,13 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView>
     if (mounted) setState(() => _playingId = null);
   }
 
+  Future<void> _stopAudio() async {
+    await _player.stop();
+    if (mounted) setState(() => _playingId = null);
+  }
+
+  bool get _isAudioPlaying => _playingId != null;
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
   void _addMsg(_Msg m) { if (mounted) setState(() => _msgs.add(m)); }
 
@@ -340,18 +347,19 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView>
   }
 
   Widget _emptyState() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(36),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 8),
           AnimatedBuilder(
             animation: _pulse,
             builder: (_, __) => Transform.scale(
               scale: 1.0 + 0.04 * _pulse.value,
               child: Container(
-                width: 96,
-                height: 96,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
@@ -360,46 +368,46 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView>
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFF10B981).withOpacity(0.3),
-                      blurRadius: 32, spreadRadius: 2,
+                      blurRadius: 28, spreadRadius: 2,
                     ),
                   ],
                 ),
-                child: const Icon(Icons.mic_rounded, size: 44, color: Colors.white),
+                child: const Icon(Icons.mic_rounded, size: 36, color: Colors.white),
               ),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
           Text(
             'Ask anything about your crops',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: FontWeight.bold,
               color: Colors.white.withOpacity(0.85),
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             'Speak in ${_lang.name} — I\'ll reply in ${_lang.name}\nwith voice & text',
-            style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.38), height: 1.6),
+            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.38), height: 1.5),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 22),
           ...[
             '🌿 My tomato leaves have yellow spots',
-            '🪲 How can I remove pests without chemicals?',
-            '💧 When should I water my rice crop?',
+            '🪲 Remove pests without chemicals?',
+            '💧 When to water my rice crop?',
           ].map((s) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.18)),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.16)),
               ),
               child: Text(s,
-                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.5)),
+                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.45)),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -626,7 +634,7 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView>
 
   // ─── Mic bar ──────────────────────────────────────────────────────────────
   Widget _micBar() => Container(
-    padding: const EdgeInsets.fromLTRB(24, 14, 24, 30),
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
     decoration: BoxDecoration(
       color: const Color(0xFF0D1B2E),
       border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
@@ -654,65 +662,90 @@ class _VoiceDoctorViewState extends State<VoiceDoctorView>
               }),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
         ],
-        // Mic button
-        GestureDetector(
-          onTap: _onMicTap,
-          child: AnimatedBuilder(
-            animation: _pulse,
-            builder: (_, __) {
-              final s = _isListening ? 1.0 + 0.06 * _pulse.value : 1.0;
-              final g = _isListening ? 28.0 + 14.0 * _pulse.value
-                  : (_isProcessing ? 10.0 : 18.0);
-              return Transform.scale(
-                scale: s,
+        // ── Buttons row ──
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Stop audio button — shown when TTS is playing
+            if (_isAudioPlaying) ...[
+              GestureDetector(
+                onTap: _stopAudio,
                 child: Container(
-                  width: 70,
-                  height: 70,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: _isProcessing
-                          ? [const Color(0xFF475569), const Color(0xFF334155)]
-                          : _isListening
-                              ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
-                              : [const Color(0xFF10B981), const Color(0xFF059669)],
-                    ),
-                    boxShadow: [BoxShadow(
-                      color: (_isListening
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFF10B981))
-                          .withOpacity(_isProcessing ? 0.08 : 0.38),
-                      blurRadius: g, spreadRadius: 2,
-                    )],
+                    color: const Color(0xFFEF4444).withOpacity(0.15),
+                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.5)),
                   ),
-                  child: _isProcessing
-                      ? const Padding(
-                          padding: EdgeInsets.all(22),
-                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                        )
-                      : Icon(
-                          _isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                          size: 30, color: Colors.white,
-                        ),
+                  child: const Icon(Icons.stop_rounded, size: 24, color: Color(0xFFEF4444)),
                 ),
-              );
-            },
-          ),
+              ),
+              const SizedBox(width: 20),
+            ],
+            // Main mic button
+            GestureDetector(
+              onTap: _onMicTap,
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, __) {
+                  final s = _isListening ? 1.0 + 0.06 * _pulse.value : 1.0;
+                  final g = _isListening ? 28.0 + 14.0 * _pulse.value
+                      : (_isProcessing ? 10.0 : 18.0);
+                  return Transform.scale(
+                    scale: s,
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _isProcessing
+                              ? [const Color(0xFF475569), const Color(0xFF334155)]
+                              : _isListening
+                                  ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                                  : [const Color(0xFF10B981), const Color(0xFF059669)],
+                        ),
+                        boxShadow: [BoxShadow(
+                          color: (_isListening
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF10B981))
+                              .withOpacity(_isProcessing ? 0.08 : 0.38),
+                          blurRadius: g, spreadRadius: 2,
+                        )],
+                      ),
+                      child: _isProcessing
+                          ? const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                            )
+                          : Icon(
+                              _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                              size: 30, color: Colors.white,
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(
-          _isProcessing
-              ? 'Getting answer from Gemini…'
-              : _isListening
-                  ? 'Tap ■ to stop  •  Speak clearly'
-                  : _sttReady
-                      ? 'Tap to speak in ${_lang.name}'
-                      : 'Initialising microphone…',
-          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.32)),
+          _isAudioPlaying
+              ? 'Tap ■ to stop voice playback'
+              : _isProcessing
+                  ? 'Getting answer from Gemini…'
+                  : _isListening
+                      ? 'Tap ■ to stop  •  Speak clearly'
+                      : _sttReady
+                          ? 'Tap to speak in ${_lang.name}'
+                          : 'Initialising microphone…',
+          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.32)),
         ),
       ],
     ),
