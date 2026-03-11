@@ -427,18 +427,28 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Good ${_getGreeting()}, $_displayName',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Good ${_getGreeting()}, $_displayName',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('🌱', style: TextStyle(fontSize: 14)),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Text('🌱', style: TextStyle(fontSize: 14)),
-                    const Spacer(),
                     Text(
                       _currentTime,
                       style: const TextStyle(

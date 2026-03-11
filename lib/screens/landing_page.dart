@@ -51,11 +51,15 @@ class LandingPage extends StatelessWidget {
           ),
 
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                   const Spacer(),
                   
                   // Hero Visual - Refined Icon
@@ -197,6 +201,9 @@ class LandingPage extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+                ),
+              ],
             ),
           ),
         ],
