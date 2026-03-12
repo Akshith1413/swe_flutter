@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 /// - Feedback retrieval by diagnosis ID
 class FeedbackService {
   // Base URL for the feedback API
-  static const String _baseUrl = 'http://localhost:5000/api/feedback';
+  static const String _baseUrl = 'http://127.0.0.1:5000/api/feedback';
 
   /// Submit feedback for a diagnosis.
   ///

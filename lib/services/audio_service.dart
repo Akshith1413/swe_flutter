@@ -107,11 +107,15 @@ class AudioService {
     String url = '';
     switch (type) {
       case 'success':
-        url = 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3';
-        break;
       case 'error':
-        url = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
-        break;
+      case 'soft_alert':
+        try {
+          await _audioPlayer.play(AssetSource('sounds/soft_alert.mp3'));
+          return;
+        } catch (e) {
+          debugPrint('Error playing asset soft_alert: $e');
+        }
+        return;
       case 'click':
       default:
         url = 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3';

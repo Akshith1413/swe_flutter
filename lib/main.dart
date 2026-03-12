@@ -11,6 +11,7 @@ import 'services/preferences_service.dart';
 import 'services/consent_service.dart';
 import 'services/audio_service.dart';
 import 'screens/main_app.dart';
+import 'services/farm_task_notification_service.dart';
 
 // Firebase conditionally imported for platforms that support it
 import 'package:firebase_core/firebase_core.dart';
@@ -57,6 +58,15 @@ void main() async {
   await preferencesService.init();
   await consentService.init();
   await audioService.init();
+
+  // Initialize farm task notifications
+  try {
+    await FarmTaskNotificationService.initialize();
+    // Schedule initial notification refresh
+    FarmTaskNotificationService.refreshAllNotifications();
+  } catch (e) {
+    debugPrint('Farm task notification init failed: $e');
+  }
 
   runApp(const CropAIdApp());
 }

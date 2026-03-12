@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/localization/translation_service.dart';
@@ -9,6 +10,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../services/region_service.dart';
 import '../services/alert_manager.dart';
 import '../models/alert_models.dart';
+import '../services/task_reminder_service.dart';
+import '../services/socket_service.dart';
+import '../widgets/notification_panel.dart';
 
 /// HomeView - Main app home screen with action grid.
 /// 
@@ -37,6 +41,12 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   bool _isGuest = false;
   int _pendingSyncCount = 0; // US15: Pending offline sync count
+  bool _showNotifications = false;
+  int _pendingReminderCount = 0;
+  Timer? _reminderCountTimer;
+  final List<StreamSubscription> _socketSubs = [];
+  
+  static bool _hasShownWelcome = false;
 
   @override
   void initState() {
@@ -44,19 +54,59 @@ class _HomeViewState extends State<HomeView> {
     _checkGuestMode();
     _loadPendingSyncCount();
     _checkRegionSetup();
+    _loadPendingReminderCount();
 
-    // Show welcome alert
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          AlertManager.showInfo(
-            context,
-            'Welcome to CropAId! Tap Scan to start diagnosing your plants.',
-            urgency: UrgencyLevel.low,
-          );
-        }
+    // Refresh pending count every 30s
+    _reminderCountTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _loadPendingReminderCount(),
+    );
+
+    // Listen to socket events for real-time badge updates
+    _socketSubs.add(
+      SocketService.instance.onReminderStatusChanged.listen((_) => _loadPendingReminderCount()),
+    );
+    _socketSubs.add(
+      SocketService.instance.onReminderCreated.listen((_) => _loadPendingReminderCount()),
+    );
+    _socketSubs.add(
+      SocketService.instance.onReminderDeleted.listen((_) => _loadPendingReminderCount()),
+    );
+
+    // Show welcome alert only once per session
+    if (!_hasShownWelcome) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            AlertManager.showInfo(
+              context,
+              'Welcome to CropAId! Tap Scan to start diagnosing your plants.',
+              urgency: UrgencyLevel.low,
+            );
+            _hasShownWelcome = true;
+          }
+        });
       });
-    });
+    }
+  }
+
+  @override
+  void dispose() {
+    _reminderCountTimer?.cancel();
+    for (final sub in _socketSubs) {
+      sub.cancel();
+    }
+    super.dispose();
+  }
+
+  Future<void> _loadPendingReminderCount() async {
+    final userId = await preferencesService.getUserId();
+    if (userId == null || userId.isEmpty) return;
+    final reminders = await TaskReminderService.fetchTodayReminders(userId);
+    final pending = reminders.where((r) => r.status == 'pending').length;
+    if (mounted) {
+      setState(() => _pendingReminderCount = pending);
+    }
   }
 
   /// Checks if the user is in guest mode to display the banner.
@@ -181,58 +231,135 @@ class _HomeViewState extends State<HomeView> {
     return 'homeView.greeting.evening';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.nature50,
-            Color(0xFFD1FAE5), // emerald-50
-            Color(0xFFCCFBF1), // teal-50
+  void _showLinkDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Link with Web'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the Sync Code shown on the web calendar screen to see the same reminders.',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Sync Code',
+                hintText: 'e.g. fd60169372f79f4e16c317a2',
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 24,
+            ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final code = controller.text.trim();
+              if (code.isEmpty) return;
+              await preferencesService.setUserId(code);
+              SocketService.instance.disconnect();
+              SocketService.instance.connect(code);
+              if (mounted) Navigator.pop(ctx);
+              _loadPendingReminderCount();
+            },
+            child: const Text('Link'),
+          ),
+        ],
       ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              _buildHeader(context),
-              const SizedBox(height: 24),
+    );
+  }
 
-              // US6: Guest Mode Banner
-              if (_isGuest) ...[
-                _buildGuestBanner(context),
-                const SizedBox(height: 24),
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Main scrollable content
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.nature50,
+                Color(0xFFD1FAE5), // emerald-50
+                Color(0xFFCCFBF1), // teal-50
               ],
+            ),
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  _buildHeader(context),
+                  const SizedBox(height: 24),
 
-              // Main Actions Grid
-              _buildMainActionsGrid(context),
-              const SizedBox(height: 16),
+                  // US6: Guest Mode Banner
+                  if (_isGuest) ...[
+                    _buildGuestBanner(context),
+                    const SizedBox(height: 24),
+                  ],
 
-              // Pest Alert
-              _buildPestAlert(context),
-              const SizedBox(height: 16),
+                  // Main Actions Grid
+                  _buildMainActionsGrid(context),
+                  const SizedBox(height: 16),
 
-              // Weather Widget
-              _buildWeatherWidget(context),
-              const SizedBox(height: 24),
+                  // Pest Alert
+                  _buildPestAlert(context),
+                  const SizedBox(height: 16),
 
-              // Quick Tip
-              _buildQuickTip(context),
-              const SizedBox(height: 16),
+                  // Weather Widget
+                  _buildWeatherWidget(context),
+                  const SizedBox(height: 24),
 
-              // Status Footer
-              _buildStatusFooter(context),
-            ],
+                  // Quick Tip
+                  _buildQuickTip(context),
+                  const SizedBox(height: 16),
+
+                  // Status Footer
+                  _buildStatusFooter(context),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+
+        // Notification panel overlay
+        if (_showNotifications) ...[
+          // Tap-to-close backdrop
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => setState(() => _showNotifications = false),
+              child: Container(color: Colors.black26),
+            ),
+          ),
+          // Panel positioned below header
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 60,
+            left: 0,
+            right: 0,
+            child: NotificationPanel(
+              onClose: () => setState(() => _showNotifications = false),
+              onViewAll: () {
+                setState(() => _showNotifications = false);
+                widget.onNavigate('reminders');
+              },
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -355,6 +482,47 @@ class _HomeViewState extends State<HomeView> {
         ),
         Row(
           children: [
+            // Notification Bell Button
+            Stack(
+              children: [
+                _buildHeaderButton(
+                  context,
+                  icon: _showNotifications
+                      ? Icons.notifications_active
+                      : Icons.notifications_outlined,
+                  onTap: () {
+                    setState(() => _showNotifications = !_showNotifications);
+                  },
+                ),
+                if (_pendingReminderCount > 0)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _pendingReminderCount > 9
+                              ? '9+'
+                              : '$_pendingReminderCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 8),
              // Audio Settings Button
             _buildHeaderButton(
               context,
@@ -510,6 +678,7 @@ class _HomeViewState extends State<HomeView> {
                   bgColorLight: const Color(0xFFFFF1F2),
                   onTap: () => widget.onNavigate('podcast'),
                 ),
+
               ],
             ),
           ],

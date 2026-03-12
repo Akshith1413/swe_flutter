@@ -20,13 +20,13 @@ class AlertToneManager {
       String soundPath;
       switch (urgency) {
         case UrgencyLevel.high:
-          soundPath = 'assets/sounds/urgent_alert.mp3';
+          soundPath = 'sounds/urgent_alert.mp3';
           break;
         case UrgencyLevel.medium:
-          soundPath = 'assets/sounds/normal_alert.mp3';
+          soundPath = 'sounds/normal_alert.mp3';
           break;
         case UrgencyLevel.low:
-          soundPath = 'assets/sounds/soft_alert.mp3';
+          soundPath = 'sounds/soft_alert.mp3';
           break;
       }
 

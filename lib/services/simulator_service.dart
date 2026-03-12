@@ -64,7 +64,7 @@ class SimulatorService {
               const String.fromEnvironment('FLUTTER_WEB_USE_SKIA',
                       defaultValue: 'false') ==
                   'false'
-          ? 'http://localhost:3000/api/simulator/predict'
+          ? 'http://127.0.0.1:5000/api/simulator/predict'
           : '$_baseUrl/predict';
 
       final response = await http.post(

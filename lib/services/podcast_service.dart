@@ -77,7 +77,7 @@ class PodcastService {
               const String.fromEnvironment('FLUTTER_WEB_USE_SKIA',
                       defaultValue: 'false') ==
                   'false'
-          ? 'http://localhost:3000/api/podcast/generate'
+          ? 'http://127.0.0.1:5000/api/podcast/generate'
           : '$_baseUrl/generate';
 
       final response = await http.post(
@@ -120,7 +120,7 @@ class PodcastService {
               const String.fromEnvironment('FLUTTER_WEB_USE_SKIA',
                       defaultValue: 'false') ==
                   'false'
-          ? 'http://localhost:3000/api/tts/synthesize'
+          ? 'http://127.0.0.1:5000/api/tts/synthesize'
           : '$_ttsBaseUrl/synthesize';
 
       // Truncate to 2500 chars (Sarvam limit)

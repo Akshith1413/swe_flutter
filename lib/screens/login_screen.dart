@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
         },
         onVerificationFailed: (e) {
           setState(() => _loading = false);
-          _showMessage('Verification failed: ${e.message}');
+          _showMessage('Verification failed: ${e.toString()}');
           audioService.confirmAction('error', message: 'Verification failed');
         },
         onVerificationCompleted: (credential) async {
@@ -137,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       setState(() => _loading = false);
       _showMessage('Login successful');
+      audioService.playSound('soft_alert'); // Use soft alert sound requested by user
       audioService.confirmAction('success', message: 'Welcome to Crop AId');
       widget.onLogin();
     } catch (e) {

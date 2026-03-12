@@ -73,10 +73,17 @@ class _SimulatorViewState extends State<SimulatorView>
     });
 
     try {
+      // Map forecast to remove non-encodable IconData
+      final forecastForBackend = _mockForecast.map((d) => {
+        'day': d['day'],
+        'temp': d['temp'],
+        'humidity': d['humidity'],
+      }).toList();
+
       final result = await simulatorService.getPrediction(
         crop: _selectedCrop,
         currentConditions: _currentConditions,
-        forecast: _mockForecast,
+        forecast: forecastForBackend,
         actions: _selectedActions.toList(),
       );
 

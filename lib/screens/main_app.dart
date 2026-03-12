@@ -1,10 +1,11 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/providers/language_provider.dart';
 import '../services/consent_service.dart';
 import '../services/preferences_service.dart';
-import '../services/crop_service.dart' hide preferencesService;
+import '../services/crop_service.dart';
 import '../widgets/crop_advice_card.dart';
 import 'landing_page.dart';
 import 'consent_screen.dart';
@@ -28,6 +29,10 @@ import '../models/pending_media.dart';
 import '../models/analysis_result.dart';
 import '../services/offline_storage_service.dart';
 import 'marketing_home_page.dart';
+import 'farm_tasks_screen.dart';
+import 'reminders_screen.dart';
+import '../services/socket_service.dart';
+import '../services/task_reminder_notification_service.dart';
 
 /// The main application widget that manages the high-level app state and navigation flow.
 /// 
@@ -53,6 +58,7 @@ class _MainAppState extends State<MainApp> {
   // Current view within the 'app' state
   String _currentView = 'home';
   bool _isOnline = true;
+  bool _remindersInitialized = false;
 
   @override
   void initState() {
@@ -64,7 +70,15 @@ class _MainAppState extends State<MainApp> {
   Future<void> _initApp() async {
     await preferencesService.init();
     await consentService.init();
-    
+
+    // Ensure a userId exists (using a stable ID for guest sync during local development)
+    final existingUserId = await preferencesService.getUserId();
+    if (existingUserId == null || existingUserId.isEmpty) {
+      const generatedId = '1aa73030589c2135f668eacb'; // Use a fixed stable ID for local sync
+      await preferencesService.setUserId(generatedId);
+      debugPrint('Generated userId: $generatedId');
+    }
+
     // US15: Attempt to sync any pending offline media
     // Fire and forget - don't block app startup
     offlineStorageService.syncAllPending().then((result) {
@@ -128,6 +142,9 @@ class _MainAppState extends State<MainApp> {
     
     if (!mounted) return;
     
+    // Re-initialize sockets and reminders with the newly fetched userId from login
+    _initSocketAndReminders();
+    
     final hasConsent = await consentService.hasConsent();
     
     if (hasConsent) {
@@ -170,6 +187,37 @@ class _MainAppState extends State<MainApp> {
     setState(() {
       _currentView = view;
     });
+  }
+
+  /// Initialize socket connection and reminder notifications when entering app state
+  void _initSocketAndReminders() async {
+    try {
+      final userId = await preferencesService.getUserId();
+      debugPrint('=== INIT SOCKET & REMINDERS ===');
+      debugPrint('userId = $userId');
+      if (userId != null && userId.isNotEmpty) {
+        debugPrint('Connecting socket for user: $userId');
+        SocketService.instance.connect(userId);
+        await TaskReminderNotificationService.initialize();
+        await TaskReminderNotificationService.refreshAllReminderNotifications();
+        debugPrint('Socket & reminders initialized OK');
+      } else {
+        debugPrint('WARNING: No userId found, cannot init reminders');
+      }
+    } catch (e) {
+      debugPrint('Reminder/socket init failed: $e');
+    }
+
+    // Check if app was opened from a reminder notification tap
+    _handlePendingReminderNotification();
+  }
+
+  /// Check for a pending reminder notification tap and navigate if needed
+  void _handlePendingReminderNotification() {
+    final payload = TaskReminderNotificationService.checkPendingNotification();
+    if (payload != null && payload.startsWith('reminder:') && mounted) {
+      _navigateTo('reminders');
+    }
   }
 
   @override
@@ -241,6 +289,12 @@ class _MainAppState extends State<MainApp> {
   }
 
   Widget _buildMainApp() {
+    if (!_remindersInitialized) {
+      _remindersInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initSocketAndReminders();
+      });
+    }
     return Scaffold(
       body: _buildCurrentView(),
     );
@@ -464,7 +518,8 @@ class _MainAppState extends State<MainApp> {
         return UserProfileView(
           onBack: () => _navigateTo('home'),
           onLogout: () {
-            // Handle logout
+            SocketService.instance.disconnect();
+            _remindersInitialized = false;
             setState(() {
               _appState = 'landing';
               _currentView = 'home';
@@ -499,6 +554,14 @@ class _MainAppState extends State<MainApp> {
         );
       case 'podcast':
         return PodcastView(
+          onBack: () => _navigateTo('home'),
+        );
+      case 'farm-tasks':
+        return FarmTasksScreen(
+          onBack: () => _navigateTo('home'),
+        );
+      case 'reminders':
+        return RemindersScreen(
           onBack: () => _navigateTo('home'),
         );
       default:

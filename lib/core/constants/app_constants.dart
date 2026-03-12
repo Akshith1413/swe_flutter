@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// App-wide constants for CropAId
 class AppConstants {
   AppConstants._();
@@ -42,7 +44,10 @@ class AppConstants {
 
   // API
   // static const String baseApiUrl = 'https://your-api-url.com';
-  // Use local backend for development
-  static const String baseApiUrl = 'http://localhost:5000';
+  // Detect platform: web uses localhost, Android emulator uses 10.0.2.2
+  static String get baseApiUrl {
+    if (kIsWeb) return 'http://127.0.0.1:5000';
+    return 'http://10.0.2.2:5000';
+  }
   static const Duration apiTimeout = Duration(seconds: 30);
 }
